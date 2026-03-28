@@ -212,6 +212,6 @@ def extract_pass1(text: str) -> dict[str, Any]:
 
         # Appeal rights
         "expedited_review_available": expedited,
-        "insurer_appeals_phone": _first_match(_PATTERNS["phone"], text),
+        "insurer_appeals_phone": _first_match(_PATTERNS["phone"], text, group=0),
         "state_commissioner_info_present": state_commissioner,
     }
