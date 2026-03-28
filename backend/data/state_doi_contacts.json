@@ -1,0 +1,361 @@
+{
+  "AL": {
+    "name": "Alabama Department of Insurance",
+    "phone": "334-269-3550",
+    "address": "201 Monroe Street, Suite 1700, Montgomery, AL 36104",
+    "complaint_url": "https://www.aldoi.gov/Consumers/FileComplaint.aspx",
+    "website": "https://www.aldoi.gov"
+  },
+  "AK": {
+    "name": "Alaska Division of Insurance",
+    "phone": "907-269-7900",
+    "address": "550 W 7th Avenue, Suite 1560, Anchorage, AK 99501",
+    "complaint_url": "https://www.commerce.alaska.gov/web/ins/ConsumerInformationComplaints.aspx",
+    "website": "https://www.commerce.alaska.gov/web/ins"
+  },
+  "AZ": {
+    "name": "Arizona Department of Insurance and Financial Institutions",
+    "phone": "602-364-2499",
+    "address": "100 N. 15th Ave, Suite 261, Phoenix, AZ 85007",
+    "complaint_url": "https://difi.az.gov/file-complaint",
+    "website": "https://difi.az.gov"
+  },
+  "AR": {
+    "name": "Arkansas Insurance Department",
+    "phone": "501-371-2600",
+    "address": "1200 W. Third St., Little Rock, AR 72201",
+    "complaint_url": "https://insurance.arkansas.gov/consumers/file-a-complaint/",
+    "website": "https://insurance.arkansas.gov"
+  },
+  "CA": {
+    "name": "California Department of Insurance",
+    "phone": "800-927-4357",
+    "address": "300 South Spring Street, South Tower, Los Angeles, CA 90013",
+    "complaint_url": "https://cdiapps.insurance.ca.gov/CP/login/",
+    "website": "https://www.insurance.ca.gov"
+  },
+  "CO": {
+    "name": "Colorado Division of Insurance",
+    "phone": "303-894-7490",
+    "address": "1560 Broadway, Suite 850, Denver, CO 80202",
+    "complaint_url": "https://doi.colorado.gov/consumers/file-a-complaint",
+    "website": "https://doi.colorado.gov"
+  },
+  "CT": {
+    "name": "Connecticut Insurance Department",
+    "phone": "800-203-3447",
+    "address": "153 Market Street, 7th Floor, Hartford, CT 06103",
+    "complaint_url": "https://www.ct.gov/cid/cwp/view.asp?a=1267&q=256950",
+    "website": "https://www.ct.gov/cid"
+  },
+  "DE": {
+    "name": "Delaware Department of Insurance",
+    "phone": "302-674-7300",
+    "address": "1351 West North Street, Suite 101, Dover, DE 19904",
+    "complaint_url": "https://insurance.delaware.gov/divisions/consumer/file-a-complaint/",
+    "website": "https://insurance.delaware.gov"
+  },
+  "FL": {
+    "name": "Florida Department of Financial Services",
+    "phone": "877-693-5236",
+    "address": "200 East Gaines Street, Tallahassee, FL 32399",
+    "complaint_url": "https://www.myfloridacfo.com/division/consumers/filingcomplaint",
+    "website": "https://www.myfloridacfo.com"
+  },
+  "GA": {
+    "name": "Georgia Office of Insurance and Safety Fire Commissioner",
+    "phone": "404-656-2070",
+    "address": "2 Martin Luther King Jr. Drive, West Tower Suite 704, Atlanta, GA 30334",
+    "complaint_url": "https://oci.georgia.gov/consumer-services/file-complaint",
+    "website": "https://oci.georgia.gov"
+  },
+  "HI": {
+    "name": "Hawaii Insurance Division",
+    "phone": "808-586-2790",
+    "address": "335 Merchant Street, Room 213, Honolulu, HI 96813",
+    "complaint_url": "https://insurance.ehawaii.gov/oca/",
+    "website": "https://cca.hawaii.gov/ins"
+  },
+  "ID": {
+    "name": "Idaho Department of Insurance",
+    "phone": "208-334-4250",
+    "address": "700 West State Street, 3rd Floor, Boise, ID 83720",
+    "complaint_url": "https://doi.idaho.gov/consumers/file-a-complaint/",
+    "website": "https://doi.idaho.gov"
+  },
+  "IL": {
+    "name": "Illinois Department of Insurance",
+    "phone": "877-527-9431",
+    "address": "320 W. Washington Street, Springfield, IL 62767",
+    "complaint_url": "https://mc.insurance.illinois.gov/messagecenter.nsf",
+    "website": "https://insurance.illinois.gov"
+  },
+  "IN": {
+    "name": "Indiana Department of Insurance (IDOI)",
+    "phone": "317-232-2385",
+    "address": "311 West Washington Street, Suite 300, Indianapolis, IN 46204",
+    "complaint_url": "https://www.in.gov/idoi/consumers/file-a-complaint/",
+    "website": "https://www.in.gov/idoi",
+    "external_review_url": "https://www.in.gov/idoi/consumers/health-insurance/external-review/",
+    "consumer_guide_url": "https://www.in.gov/idoi/consumers/health-insurance/"
+  },
+  "IA": {
+    "name": "Iowa Insurance Division",
+    "phone": "515-654-6600",
+    "address": "1963 Bell Avenue, Suite 100, Des Moines, IA 50315",
+    "complaint_url": "https://iid.iowa.gov/consumers/file-a-complaint",
+    "website": "https://iid.iowa.gov"
+  },
+  "KS": {
+    "name": "Kansas Insurance Department",
+    "phone": "785-296-3071",
+    "address": "1300 SW Arrowhead Road, Topeka, KS 66604",
+    "complaint_url": "https://www.ksinsurance.org/consumers/complaints.php",
+    "website": "https://www.ksinsurance.org"
+  },
+  "KY": {
+    "name": "Kentucky Department of Insurance",
+    "phone": "800-595-6053",
+    "address": "215 West Main Street, Frankfort, KY 40601",
+    "complaint_url": "https://insurance.ky.gov/ppc/",
+    "website": "https://insurance.ky.gov"
+  },
+  "LA": {
+    "name": "Louisiana Department of Insurance",
+    "phone": "800-259-5300",
+    "address": "1702 N. Third Street, Baton Rouge, LA 70802",
+    "complaint_url": "https://www.ldi.la.gov/consumers/file-a-complaint",
+    "website": "https://www.ldi.la.gov"
+  },
+  "ME": {
+    "name": "Maine Bureau of Insurance",
+    "phone": "800-300-5000",
+    "address": "76 Northern Avenue, Gardiner, ME 04345",
+    "complaint_url": "https://www.maine.gov/pfr/insurance/complaints",
+    "website": "https://www.maine.gov/pfr/insurance"
+  },
+  "MD": {
+    "name": "Maryland Insurance Administration",
+    "phone": "800-492-6116",
+    "address": "200 St. Paul Place, Suite 2700, Baltimore, MD 21202",
+    "complaint_url": "https://insurance.maryland.gov/Consumer/Pages/FileComplaint.aspx",
+    "website": "https://insurance.maryland.gov"
+  },
+  "MA": {
+    "name": "Massachusetts Division of Insurance",
+    "phone": "617-521-7794",
+    "address": "1000 Washington Street, Boston, MA 02118",
+    "complaint_url": "https://www.mass.gov/how-to/file-a-complaint-about-an-insurance-company",
+    "website": "https://www.mass.gov/orgs/division-of-insurance"
+  },
+  "MI": {
+    "name": "Michigan Department of Insurance and Financial Services",
+    "phone": "877-999-6442",
+    "address": "P.O. Box 30220, Lansing, MI 48909",
+    "complaint_url": "https://difs.state.mi.us/Complaints/",
+    "website": "https://www.michigan.gov/difs"
+  },
+  "MN": {
+    "name": "Minnesota Department of Commerce",
+    "phone": "651-539-1500",
+    "address": "85 7th Place East, Suite 280, St. Paul, MN 55101",
+    "complaint_url": "https://mn.gov/commerce/consumers/your-rights/file-a-complaint/",
+    "website": "https://mn.gov/commerce"
+  },
+  "MS": {
+    "name": "Mississippi Insurance Department",
+    "phone": "601-359-3569",
+    "address": "501 North West Street, Woolfolk Building, Suite 1001, Jackson, MS 39201",
+    "complaint_url": "https://www.mid.ms.gov/consumer/consumer-complaint.aspx",
+    "website": "https://www.mid.ms.gov"
+  },
+  "MO": {
+    "name": "Missouri Department of Commerce and Insurance",
+    "phone": "800-726-7390",
+    "address": "301 W. High Street, Room 530, Jefferson City, MO 65101",
+    "complaint_url": "https://insurance.mo.gov/consumers/fileacomplaint/",
+    "website": "https://insurance.mo.gov"
+  },
+  "MT": {
+    "name": "Montana Office of the Commissioner of Securities and Insurance",
+    "phone": "800-332-6148",
+    "address": "840 Helena Ave., Helena, MT 59601",
+    "complaint_url": "https://csimt.gov/consumers/insurance-complaints/file-a-complaint/",
+    "website": "https://csimt.gov"
+  },
+  "NE": {
+    "name": "Nebraska Department of Insurance",
+    "phone": "402-471-2201",
+    "address": "P.O. Box 82089, Lincoln, NE 68501",
+    "complaint_url": "https://doi.nebraska.gov/consumers/file-a-complaint",
+    "website": "https://doi.nebraska.gov"
+  },
+  "NV": {
+    "name": "Nevada Division of Insurance",
+    "phone": "775-687-0700",
+    "address": "1818 E. College Parkway, Suite 103, Carson City, NV 89706",
+    "complaint_url": "https://doi.nv.gov/About/Complaints/File_a_Complaint/",
+    "website": "https://doi.nv.gov"
+  },
+  "NH": {
+    "name": "New Hampshire Insurance Department",
+    "phone": "603-271-2261",
+    "address": "21 South Fruit Street, Suite 14, Concord, NH 03301",
+    "complaint_url": "https://www.nh.gov/insurance/consumers/complaints.htm",
+    "website": "https://www.nh.gov/insurance"
+  },
+  "NJ": {
+    "name": "New Jersey Department of Banking and Insurance",
+    "phone": "800-446-7467",
+    "address": "20 West State Street, Trenton, NJ 08625",
+    "complaint_url": "https://www.njconsumeraffairs.gov/Insurance",
+    "website": "https://www.state.nj.us/dobi"
+  },
+  "NM": {
+    "name": "New Mexico Office of Superintendent of Insurance",
+    "phone": "855-427-5674",
+    "address": "P.O. Box 1269, Santa Fe, NM 87504",
+    "complaint_url": "https://www.osi.state.nm.us/consumer-help/file-a-complaint",
+    "website": "https://www.osi.state.nm.us"
+  },
+  "NY": {
+    "name": "New York Department of Financial Services",
+    "phone": "800-342-3736",
+    "address": "One Commerce Plaza, Albany, NY 12257",
+    "complaint_url": "https://www.dfs.ny.gov/complaint",
+    "website": "https://www.dfs.ny.gov"
+  },
+  "NC": {
+    "name": "North Carolina Department of Insurance",
+    "phone": "855-408-1212",
+    "address": "325 N. Salisbury Street, Raleigh, NC 27603",
+    "complaint_url": "https://www.ncdoi.gov/consumers/file-a-complaint/",
+    "website": "https://www.ncdoi.gov"
+  },
+  "ND": {
+    "name": "North Dakota Insurance Department",
+    "phone": "701-328-2440",
+    "address": "600 E. Boulevard Ave. Dept. 401, Bismarck, ND 58505",
+    "complaint_url": "https://www.nd.gov/ndins/consumers/file-a-complaint/",
+    "website": "https://www.nd.gov/ndins"
+  },
+  "OH": {
+    "name": "Ohio Department of Insurance",
+    "phone": "800-686-1526",
+    "address": "50 West Town Street, Third Floor, Suite 300, Columbus, OH 43215",
+    "complaint_url": "https://insurance.ohio.gov/consumer/file-a-complaint",
+    "website": "https://insurance.ohio.gov"
+  },
+  "OK": {
+    "name": "Oklahoma Insurance Department",
+    "phone": "800-522-0071",
+    "address": "400 NE 50th Street, Oklahoma City, OK 73105",
+    "complaint_url": "https://www.oid.ok.gov/consumer/complaint/",
+    "website": "https://www.oid.ok.gov"
+  },
+  "OR": {
+    "name": "Oregon Department of Consumer and Business Services – Insurance Division",
+    "phone": "888-877-4894",
+    "address": "350 Winter Street NE, Room 440, Salem, OR 97301",
+    "complaint_url": "https://dfr.oregon.gov/help/file-complaint",
+    "website": "https://dfr.oregon.gov"
+  },
+  "PA": {
+    "name": "Pennsylvania Insurance Department",
+    "phone": "877-881-6388",
+    "address": "1326 Strawberry Square, Harrisburg, PA 17120",
+    "complaint_url": "https://www.insurance.pa.gov/Consumers/Pages/FilingaComplaint.aspx",
+    "website": "https://www.insurance.pa.gov"
+  },
+  "RI": {
+    "name": "Rhode Island Division of Insurance",
+    "phone": "401-462-9520",
+    "address": "1511 Pontiac Avenue, Cranston, RI 02920",
+    "complaint_url": "https://dbr.ri.gov/divisions/insurance/consumer-protection",
+    "website": "https://dbr.ri.gov/divisions/insurance"
+  },
+  "SC": {
+    "name": "South Carolina Department of Insurance",
+    "phone": "803-737-6160",
+    "address": "1201 Main Street, Suite 1000, Columbia, SC 29201",
+    "complaint_url": "https://doi.sc.gov/page/consumer-services",
+    "website": "https://doi.sc.gov"
+  },
+  "SD": {
+    "name": "South Dakota Division of Insurance",
+    "phone": "605-773-3563",
+    "address": "124 S. Euclid Ave., 2nd Floor, Pierre, SD 57501",
+    "complaint_url": "https://dlr.sd.gov/insurance/consumers.aspx",
+    "website": "https://dlr.sd.gov/insurance"
+  },
+  "TN": {
+    "name": "Tennessee Department of Commerce and Insurance",
+    "phone": "615-741-2241",
+    "address": "500 James Robertson Pkwy., Nashville, TN 37243",
+    "complaint_url": "https://www.tn.gov/commerce/insurance/consumers/consumer-insurance-services/file-a-complaint.html",
+    "website": "https://www.tn.gov/commerce/insurance.html"
+  },
+  "TX": {
+    "name": "Texas Department of Insurance",
+    "phone": "800-252-3439",
+    "address": "333 Guadalupe St., Austin, TX 78701",
+    "complaint_url": "https://www.tdi.texas.gov/consumer/complain.html",
+    "website": "https://www.tdi.texas.gov"
+  },
+  "UT": {
+    "name": "Utah Insurance Department",
+    "phone": "801-538-3800",
+    "address": "4315 S. 2700 W., Suite 2300, Taylorsville, UT 84129",
+    "complaint_url": "https://insurance.utah.gov/consumers/how-to-file-a-complaint/",
+    "website": "https://insurance.utah.gov"
+  },
+  "VT": {
+    "name": "Vermont Department of Financial Regulation – Insurance Division",
+    "phone": "802-828-3301",
+    "address": "89 Main Street, Montpelier, VT 05620",
+    "complaint_url": "https://dfr.vermont.gov/reg-biz/insurance/consumer-insurance-information/file-a-complaint",
+    "website": "https://dfr.vermont.gov"
+  },
+  "VA": {
+    "name": "Virginia Bureau of Insurance",
+    "phone": "877-310-6560",
+    "address": "P.O. Box 1157, Richmond, VA 23218",
+    "complaint_url": "https://www.scc.virginia.gov/pages/insurance-complaints",
+    "website": "https://www.scc.virginia.gov/pages/bureau-of-insurance"
+  },
+  "WA": {
+    "name": "Washington State Office of the Insurance Commissioner",
+    "phone": "800-562-6900",
+    "address": "P.O. Box 40255, Olympia, WA 98504",
+    "complaint_url": "https://www.insurance.wa.gov/file-complaint-or-get-help",
+    "website": "https://www.insurance.wa.gov"
+  },
+  "WV": {
+    "name": "West Virginia Offices of the Insurance Commissioner",
+    "phone": "888-879-9842",
+    "address": "900 Pennsylvania Avenue, Charleston, WV 25302",
+    "complaint_url": "https://www.wvinsurance.gov/Consumer/Consumer-Complaint",
+    "website": "https://www.wvinsurance.gov"
+  },
+  "WI": {
+    "name": "Wisconsin Office of the Commissioner of Insurance",
+    "phone": "800-236-8517",
+    "address": "125 South Webster Street, Madison, WI 53703",
+    "complaint_url": "https://oci.wi.gov/Pages/Consumers/FileComplaint.aspx",
+    "website": "https://oci.wi.gov"
+  },
+  "WY": {
+    "name": "Wyoming Department of Insurance",
+    "phone": "307-777-7401",
+    "address": "106 E. 6th Avenue, Cheyenne, WY 82002",
+    "complaint_url": "https://doi.wyo.gov/consumers/how-to-file-a-complaint/",
+    "website": "https://doi.wyo.gov"
+  },
+  "DC": {
+    "name": "DC Department of Insurance, Securities and Banking",
+    "phone": "202-727-8000",
+    "address": "1050 First Street, NE, Suite 801, Washington, DC 20002",
+    "complaint_url": "https://disb.dc.gov/service/file-complaint",
+    "website": "https://disb.dc.gov"
+  }
+}
