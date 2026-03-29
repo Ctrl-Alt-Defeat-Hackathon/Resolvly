@@ -31,12 +31,6 @@ export default function LandingPage() {
                 Start Free Analysis
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
               </button>
-              <button
-                onClick={() => navigate('/indiana-resources')}
-                className="px-8 py-4 bg-surface-container-lowest text-primary border border-outline-variant/20 font-semibold rounded-xl hover:bg-surface-container-low transition-all"
-              >
-                View Indiana DOI Resources
-              </button>
             </div>
           </div>
 
@@ -168,7 +162,7 @@ export default function LandingPage() {
                 Empowering every Hoosier with the tools to push back.
               </h2>
               <button
-                onClick={() => navigate('/upload-wizard')}
+                onClick={() => navigate('/analyze')}
                 className="px-10 py-5 bg-white text-primary font-bold rounded-xl shadow-2xl hover:bg-surface-container-low transition-all"
               >
                 Begin Your Appeal Analysis
