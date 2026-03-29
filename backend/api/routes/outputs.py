@@ -6,6 +6,10 @@ POST /api/v1/outputs/action-checklist → numbered action steps
 POST /api/v1/outputs/appeal-letter    → appeal letter + provider/insurer messages
 POST /api/v1/outputs/provider-brief   → one-page physician-facing summary
 POST /api/v1/outputs/deadlines        → deadlines with ICS data
+POST /api/v1/outputs/completeness     → denial letter completeness checklist (Week 6)
+POST /api/v1/outputs/routing-card     → ERISA vs. IDOI routing card (Week 6)
+POST /api/v1/outputs/assumptions      → assumptions panel with verification guidance (Week 6)
+POST /api/v1/outputs/probability      → appeal probability breakdown (Week 6)
 """
 from __future__ import annotations
 
@@ -20,6 +24,10 @@ from agents.output_agent import (
     generate_action_checklist,
     generate_appeal_letter,
     generate_provider_brief,
+    generate_completeness_report,
+    generate_routing_card,
+    generate_assumptions_panel,
+    generate_probability_details,
 )
 
 router = APIRouter()
@@ -145,6 +153,70 @@ async def get_deadlines(req: DeadlinesRequest) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Deadlines endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=f"Deadlines failed: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Week 6 routes
+# ---------------------------------------------------------------------------
+
+@router.post("/completeness")
+async def get_completeness_report(req: OutputRequest) -> dict[str, Any]:
+    """
+    Return a field-by-field denial letter completeness checklist.
+    Each item includes the legal citation, why it matters, and action if missing.
+    """
+    try:
+        analysis = {**req.analysis, "enrichment": req.enrichment}
+        result = generate_completeness_report(req.claim_object, analysis)
+        return result.model_dump()
+    except Exception as e:
+        logger.error(f"Completeness report failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Completeness report failed: {str(e)}")
+
+
+@router.post("/routing-card")
+async def get_routing_card(req: OutputRequest) -> dict[str, Any]:
+    """
+    Return ERISA vs. IDOI regulatory routing card with full contact blocks,
+    legal basis, process steps, and a patient-readable formatted card.
+    """
+    try:
+        analysis = {**req.analysis, "enrichment": req.enrichment}
+        result = await generate_routing_card(req.claim_object, analysis)
+        return result.model_dump()
+    except Exception as e:
+        logger.error(f"Routing card generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Routing card generation failed: {str(e)}")
+
+
+@router.post("/assumptions")
+async def get_assumptions_panel(req: OutputRequest) -> dict[str, Any]:
+    """
+    Return structured assumptions panel with confidence scores,
+    impact levels, verification guidance, and what-if implications.
+    """
+    try:
+        analysis = {**req.analysis, "enrichment": req.enrichment}
+        result = generate_assumptions_panel(req.claim_object, analysis)
+        return result.model_dump()
+    except Exception as e:
+        logger.error(f"Assumptions panel failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Assumptions panel failed: {str(e)}")
+
+
+@router.post("/probability")
+async def get_probability_details(req: OutputRequest) -> dict[str, Any]:
+    """
+    Return detailed appeal probability breakdown with base rates,
+    per-factor explanations, and top improvement recommendation.
+    """
+    try:
+        analysis = {**req.analysis, "enrichment": req.enrichment}
+        result = generate_probability_details(req.claim_object, analysis)
+        return result.model_dump()
+    except Exception as e:
+        logger.error(f"Probability details failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Probability details failed: {str(e)}")
 
 
 # ---------------------------------------------------------------------------
