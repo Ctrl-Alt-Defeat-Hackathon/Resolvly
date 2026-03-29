@@ -75,6 +75,33 @@ def _strip_json_fences(text: str) -> str:
     return t.strip()
 
 
+def _extract_json_block(text: str) -> str:
+    """
+    Best-effort JSON extraction for models that return extra text.
+    When `expect_json=True`, we want the first complete JSON object/array.
+    """
+    t = text.strip()
+    if not t:
+        return t
+
+    obj_start = t.find("{")
+    obj_end = t.rfind("}")
+    arr_start = t.find("[")
+    arr_end = t.rfind("]")
+
+    obj_candidate = ""
+    if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
+        obj_candidate = t[obj_start : obj_end + 1]
+
+    arr_candidate = ""
+    if arr_start != -1 and arr_end != -1 and arr_end > arr_start:
+        arr_candidate = t[arr_start : arr_end + 1]
+
+    if obj_candidate and arr_candidate:
+        return obj_candidate if len(obj_candidate) >= len(arr_candidate) else arr_candidate
+    return obj_candidate or arr_candidate or t
+
+
 async def _complete_groq(
     prompt: str,
     expect_json: bool,
@@ -287,6 +314,8 @@ async def _complete_ollama(
             
             if expect_json:
                 content = _strip_json_fences(content)
+                # If the model included extra markdown around JSON, extract the JSON block.
+                content = _extract_json_block(content)
             
             logger.info(f"Ollama completion successful ({len(content)} chars)")
             return content
