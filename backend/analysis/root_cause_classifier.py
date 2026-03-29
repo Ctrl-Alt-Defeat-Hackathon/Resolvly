@@ -216,7 +216,7 @@ Return JSON with these fields:
 }}"""
 
     try:
-        text = await complete_llm(prompt, expect_json=True)
+        text = await complete_llm(prompt, expect_json=True, priority=2)  # High priority - needed for analysis
         if not text:
             raise ValueError("empty LLM response")
         data = json.loads(text)

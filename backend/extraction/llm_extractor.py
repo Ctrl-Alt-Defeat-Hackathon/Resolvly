@@ -101,6 +101,7 @@ async def extract_pass2(
             user_prompt,
             expect_json=True,
             system_instruction=_SYSTEM_PROMPT,
+            priority=1,  # Highest priority - extraction is critical
         )
 
         if not response_text:
