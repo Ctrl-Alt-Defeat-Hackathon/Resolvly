@@ -23,6 +23,7 @@ from agents.code_lookup_agent import run_code_lookup_agent, CodeLookupResult
 from agents.regulation_agent import run_regulation_agent, RegulationEnrichment
 from agents.state_rules_agent import run_state_rules_agent, StateRulesEnrichment
 from agents.analysis_agent import run_analysis_agent, AnalysisResult
+from analysis.root_cause_classifier import classify_root_cause
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,12 @@ async def run_orchestrator(
 
     logger.info(f"Orchestrator: starting analysis for claim {claim.upload_id}")
 
+    # Stage 0: Classify root cause first so regulation agent can use it for CMS coverage lookup
+    logger.info("Orchestrator: pre-classifying root cause")
+    root_cause_pre = await classify_root_cause(claim)
+    claim.derived.root_cause_category = root_cause_pre.category
+    logger.info(f"Orchestrator: root cause pre-classified as {root_cause_pre.category}")
+
     # Stage 1: Run Code Lookup, Regulation, and State Rules agents in parallel
     logger.info("Orchestrator: dispatching parallel agents (code lookup, regulation, state rules)")
     code_result, regulation_result, state_result = await asyncio.gather(
@@ -197,6 +204,10 @@ async def stream_orchestrator(
         event="started",
         data={"message": "Analysis pipeline started", "upload_id": claim.upload_id},
     )
+
+    # Stage 0: Pre-classify root cause so regulation agent has it available
+    root_cause_pre = await classify_root_cause(claim)
+    claim.derived.root_cause_category = root_cause_pre.category
 
     # Run all 3 parallel agents and yield as each completes
     code_task = asyncio.create_task(run_code_lookup_agent(claim))
