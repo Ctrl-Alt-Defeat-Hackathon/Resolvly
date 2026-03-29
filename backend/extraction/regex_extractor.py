@@ -40,7 +40,9 @@ _PATTERNS: dict[str, str] = {
     "prior_auth": r"(?:auth(?:orization)?\s*(?:#|no\.?|number)[:\s]*)([\w\-]{4,20})",
 
     # Denial codes
-    "carc": r"\b(?:CARC|carc|adjustment\s*reason\s*code)[:\s]*([0-9]{1,3}[A-Z]?)\b",
+    # CARC codes: explicit prefix ("CARC: 50", "adjustment reason code 50")
+    # OR EOB group-prefix format ("CO-50", "PR-27", "OA-18")
+    "carc": r"(?:(?:CARC|carc|adjustment\s*reason\s*code)[:\s]*([0-9]{1,3}[A-Z]?)|(?:CO|PR|OA|PI|CR)-([0-9]{1,3}[A-Z]?))\b",
     "rarc": r"\b(?:RARC|rarc|remark\s*code)[:\s]*([A-Z]{1,2}[0-9]{1,3}[A-Z]?)\b",
 
     # Financial amounts
@@ -151,6 +153,17 @@ def _all_matches(pattern: str, text: str, group: int = 1) -> list[str]:
 # Public extraction function
 # ---------------------------------------------------------------------------
 
+def _extract_carc(text: str) -> list[str]:
+    """Extract CARC codes from both explicit-prefix and EOB group-prefix formats."""
+    codes = []
+    for m in re.finditer(_PATTERNS["carc"], text, re.IGNORECASE):
+        # Group 1: explicit prefix (CARC: 50), Group 2: EOB prefix (CO-50)
+        code = m.group(1) or m.group(2)
+        if code:
+            codes.append(code.strip())
+    return list(dict.fromkeys(codes))
+
+
 def extract_pass1(text: str) -> dict[str, Any]:
     """
     Run all regex patterns against the document text.
@@ -202,8 +215,8 @@ def extract_pass1(text: str) -> dict[str, Any]:
         # Financial
         "currency_amounts": currencies,
 
-        # Denial codes
-        "carc_codes": _all_matches(_PATTERNS["carc"], text),
+        # Denial codes — CARC pattern has 2 groups: (explicit-prefix, group-prefix)
+        "carc_codes": _extract_carc(text),
         "rarc_codes": _all_matches(_PATTERNS["rarc"], text),
 
         # Prior auth
