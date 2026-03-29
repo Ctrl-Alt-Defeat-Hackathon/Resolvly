@@ -11,7 +11,6 @@ POST /api/v1/outputs/routing-card     → ERISA vs. IDOI routing card (Week 6)
 POST /api/v1/outputs/assumptions      → assumptions panel with verification guidance (Week 6)
 POST /api/v1/outputs/probability      → appeal probability breakdown (Week 6)
 """
-from __future__ import annotations
 
 import logging
 from typing import Any

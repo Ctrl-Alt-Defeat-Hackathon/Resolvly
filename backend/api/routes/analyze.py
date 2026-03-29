@@ -7,7 +7,6 @@ POST /api/v1/claims/analyze/stream — Server-Sent Events (SSE) streaming analys
 The streaming endpoint emits partial results as each agent completes,
 allowing the frontend to progressively render the dashboard.
 """
-from __future__ import annotations
 
 import json
 import logging
@@ -102,9 +101,9 @@ async def analyze_claim(request: Request, body: AnalyzeRequest) -> AnalyzeRespon
 # POST /analyze/stream — SSE streaming analysis
 # ---------------------------------------------------------------------------
 
-@router.post("/analyze/stream")
+@router.post("/analyze/stream", response_class=StreamingResponse)
 @limiter.limit("5/minute")
-async def analyze_claim_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
+async def analyze_claim_stream(request: Request, body: AnalyzeRequest):
     """
     Run the analysis pipeline with Server-Sent Events (SSE) streaming.
 

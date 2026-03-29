@@ -4,7 +4,6 @@ Export Routes
 POST /api/v1/export/pdf  → Generate PDF from markdown content
 POST /api/v1/export/ics  → Generate .ics calendar file for a deadline
 """
-from __future__ import annotations
 
 import io
 import logging
