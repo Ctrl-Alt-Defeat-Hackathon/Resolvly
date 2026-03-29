@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: claim-debugger-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: /backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_MODEL_PRIMARY
+        value: llama-3.3-70b-versatile
+      - key: GROQ_MODEL_FALLBACK
+        value: llama-3.1-8b-instant
+      - key: GEMINI_MODEL_PRIMARY
+        value: gemini-2.5-flash
+      - key: GEMINI_MODEL_FALLBACK
+        value: gemini-2.5-flash-lite
+      - key: LLM_MAX_CONCURRENT_REQUESTS
+        value: 1
+      - key: LLM_MIN_DELAY_BETWEEN_REQUESTS
+        value: 2.0
+      - key: LLM_RETRY_ON_RATE_LIMIT
+        value: true
+      - key: DEBUG
+        value: false
+      - key: OLLAMA_ENABLED
+        value: false
+      - key: GOOGLE_VISION_API_KEY
+        sync: false
+      - key: GOOGLE_SEARCH_API_KEY
+        sync: false
+      - key: GOOGLE_SEARCH_CX
+        sync: false
+    healthCheckPath: /health

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: claim-debugger-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Load from .env file
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL_PRIMARY=${GROQ_MODEL_PRIMARY:-llama-3.3-70b-versatile}
+      - GROQ_MODEL_FALLBACK=${GROQ_MODEL_FALLBACK:-llama-3.1-8b-instant}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL_PRIMARY=${GEMINI_MODEL_PRIMARY:-gemini-2.5-flash}
+      - GEMINI_MODEL_FALLBACK=${GEMINI_MODEL_FALLBACK:-gemini-2.5-flash-lite}
+      - GOOGLE_VISION_API_KEY=${GOOGLE_VISION_API_KEY}
+      - GOOGLE_SEARCH_API_KEY=${GOOGLE_SEARCH_API_KEY}
+      - GOOGLE_SEARCH_CX=${GOOGLE_SEARCH_CX}
+      - DEBUG=${DEBUG:-false}
+      - LLM_MAX_CONCURRENT_REQUESTS=${LLM_MAX_CONCURRENT_REQUESTS:-1}
+      - LLM_RETRY_ON_RATE_LIMIT=${LLM_RETRY_ON_RATE_LIMIT:-true}
+      - LLM_MIN_DELAY_BETWEEN_REQUESTS=${LLM_MIN_DELAY_BETWEEN_REQUESTS:-2.0}
+      - OLLAMA_ENABLED=${OLLAMA_ENABLED:-false}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: claim-debugger-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  default:
+    name: claim-debugger-network
