@@ -1,8 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { loadAnalysisBundle } from '../lib/sessionKeys'
+import { postAppealLetter, postExportPdf } from '../lib/api'
 
 const tabs = ['Appeal Letter (Draft)', 'Message to Provider', 'Message to Insurer']
+
+const STATIC_DRAFT = `[DATE]
+Indiana Department of Insurance
+311 West Washington Street
+Indianapolis, IN 46204
+
+RE: Appeal of Coverage Denial for Patient [PATIENT_NAME]
+Member ID: [MEMBER_ID] | Case Ref: #IN-99283-X
+
+To the Consumer Services Division,
+
+I am writing to formally appeal the denial of coverage issued by [CARRIER_NAME] regarding medical services provided on [SERVICE_DATE]. Under Indiana Code § 27-8-28, I am exercising my right to a formal review of this determination.
+
+The denial was based on the assertion that the treatment was "not medically necessary." However, the following Indiana-specific regulatory clinical criteria were not properly applied in this assessment...
+
+[AI NOTE: Insert specific clinical justification here. The uploaded EOB indicates code 99214 was contested. Resolvly suggests referencing IN-Admin-Code Title 760 for peer-review standards.]
+
+Attached you will find the provider's certification and the itemized denial statement. I request a response within the 30-day statutory period required for standard appeals.
+
+Sincerely,
+
+[USER_SIGNATURE]`
 
 const gaps = [
   { icon: 'help_outline', iconClass: 'text-tertiary-container', title: 'Ambiguous Procedure Codes', desc: 'Code 99284 was listed without a primary diagnosis link. Verify with provider.' },
@@ -20,6 +44,48 @@ const actionItems = [
 export default function AppealDrafting() {
   const [activeTab, setActiveTab] = useState(0)
   const [items, setItems] = useState(actionItems)
+  const bundle = useMemo(() => loadAnalysisBundle(), [])
+  const [drafts, setDrafts] = useState<[string, string, string]>([STATIC_DRAFT, STATIC_DRAFT, STATIC_DRAFT])
+
+  useEffect(() => {
+    if (!bundle) return
+    postAppealLetter(bundle.claim_object, bundle.analysis, bundle.enrichment, {})
+      .then(r => {
+        setDrafts([
+          (typeof r.appeal_letter === 'string' && r.appeal_letter) ? r.appeal_letter : STATIC_DRAFT,
+          (typeof r.provider_message === 'string' && r.provider_message) ? r.provider_message : STATIC_DRAFT,
+          (typeof r.insurer_message === 'string' && r.insurer_message) ? r.insurer_message : STATIC_DRAFT,
+        ])
+      })
+      .catch(() => {})
+  }, [bundle])
+
+  async function exportPdf() {
+    const content = drafts[activeTab]
+    try {
+      const blob = await postExportPdf({ content, format: 'appeal_letter', title: 'Appeal draft' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'appeal-draft.pdf'
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch {
+      /* silent */
+    }
+  }
+
+  function downloadTxt() {
+    const blob = new Blob([drafts[activeTab]], { type: 'text/plain;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'appeal-draft.txt'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  function copyDraft() {
+    void navigator.clipboard.writeText(drafts[activeTab])
+  }
 
   return (
     <div className="bg-background text-on-background selection:bg-secondary-container min-h-screen flex flex-col">
@@ -70,13 +136,13 @@ export default function AppealDrafting() {
                     <span className="text-xs font-bold uppercase tracking-widest text-outline">v1.2 Draft</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button className="p-2 hover:bg-surface-container rounded-lg text-primary transition-colors" title="Copy">
+                    <button type="button" onClick={() => copyDraft()} className="p-2 hover:bg-surface-container rounded-lg text-primary transition-colors" title="Copy">
                       <span className="material-symbols-outlined">content_copy</span>
                     </button>
-                    <button className="flex items-center gap-2 px-3 py-2 hover:bg-surface-container rounded-lg text-primary transition-colors text-sm font-medium">
+                    <button type="button" onClick={() => downloadTxt()} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-container rounded-lg text-primary transition-colors text-sm font-medium">
                       <span className="material-symbols-outlined text-[20px]">download</span> .txt
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg transition-all hover:opacity-90 text-sm font-medium">
+                    <button type="button" onClick={() => void exportPdf()} className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg transition-all hover:opacity-90 text-sm font-medium">
                       <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span> PDF Export
                     </button>
                   </div>
@@ -86,30 +152,9 @@ export default function AppealDrafting() {
                 <div className="p-10 min-h-[600px] text-on-surface leading-loose"
                   style={{ background: 'linear-gradient(to bottom, transparent 31px, #f3f4f5 32px)', backgroundSize: '100% 32px' }}>
                   <div className="max-w-prose mx-auto bg-white p-8 shadow-sm">
-                    <p className="mb-6">
-                      [DATE]<br />
-                      Indiana Department of Insurance<br />
-                      311 West Washington Street<br />
-                      Indianapolis, IN 46204
-                    </p>
-                    <p className="mb-6 font-bold">
-                      RE: Appeal of Coverage Denial for Patient [PATIENT_NAME]<br />
-                      Member ID: [MEMBER_ID] | Case Ref: #IN-99283-X
-                    </p>
-                    <p className="mb-4">To the Consumer Services Division,</p>
-                    <p className="mb-4">
-                      I am writing to formally appeal the denial of coverage issued by [CARRIER_NAME] regarding medical services provided on [SERVICE_DATE]. Under Indiana Code § 27-8-28, I am exercising my right to a formal review of this determination.
-                    </p>
-                    <p className="mb-4">
-                      The denial was based on the assertion that the treatment was "not medically necessary." However, the following Indiana-specific regulatory clinical criteria were not properly applied in this assessment...
-                    </p>
-                    <div className="bg-surface-container-low p-4 my-8 border-l-4 border-primary italic text-on-surface-variant">
-                      [AI NOTE: Insert specific clinical justification here. The uploaded EOB indicates code 99214 was contested. Resolvly suggests referencing IN-Admin-Code Title 760 for peer-review standards.]
+                    <div className="whitespace-pre-wrap text-sm text-on-surface leading-relaxed">
+                      {drafts[activeTab]}
                     </div>
-                    <p className="mb-4">
-                      Attached you will find the provider's certification and the itemized denial statement. I request a response within the 30-day statutory period required for standard appeals.
-                    </p>
-                    <p>Sincerely,<br /><br /><br />[USER_SIGNATURE]</p>
                   </div>
                 </div>
               </div>

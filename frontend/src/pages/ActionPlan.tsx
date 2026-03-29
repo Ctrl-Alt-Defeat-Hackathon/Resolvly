@@ -1,9 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { loadAnalysisBundle } from '../lib/sessionKeys'
+import { postActionChecklist, postDeadlines, postExportIcs } from '../lib/api'
 
-const steps = [
+type StepRow = {
+  num: number
+  title: string
+  desc: string
+  why?: string
+  active: boolean
+  tag?: string
+  tagClass?: string
+}
+
+const DEFAULT_STEPS: StepRow[] = [
   {
     num: 1,
     title: 'Acquire Medical Records & EOB',
@@ -34,10 +46,118 @@ const steps = [
   },
 ]
 
+function fmtMoney(n: number | undefined | null) {
+  if (n == null || Number.isNaN(Number(n))) return '—'
+  return Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+}
+
+function parsePart(iso: string | undefined) {
+  if (!iso) return { m: '—', d: '—' }
+  const d = new Date(iso + (iso.length === 10 ? 'T12:00:00' : ''))
+  if (Number.isNaN(d.getTime())) return { m: '—', d: '—' }
+  return { m: d.toLocaleString('en-US', { month: 'short' }), d: String(d.getDate()) }
+}
+
+function severityLabel(t: string | undefined) {
+  if (t === 'urgent') return 'Urgent'
+  if (t === 'routine') return 'Routine'
+  return 'Time-Sensitive'
+}
+
 export default function ActionPlan() {
   const navigate = useNavigate()
   const [openStep, setOpenStep] = useState<number | null>(null)
   const [reminders, setReminders] = useState({ weekly: true, urgent: true, regulatory: false })
+  const [steps, setSteps] = useState<StepRow[]>(DEFAULT_STEPS)
+  const [deadlineInfo, setDeadlineInfo] = useState<Array<{ type: string; date?: string; ics_data?: string; source_law?: string }>>([])
+
+  const bundle = useMemo(() => loadAnalysisBundle(), [])
+
+  const ident = (bundle?.claim_object?.identification ?? {}) as Record<string, unknown>
+  const financial = (bundle?.claim_object?.financial ?? {}) as Record<string, unknown>
+  const denial = (bundle?.claim_object?.denial_reason ?? {}) as Record<string, unknown>
+  const analysis = bundle?.analysis ?? {}
+  const planCtx = bundle?.plan_context ?? {}
+  const approval = (analysis.approval_probability ?? {}) as Record<string, unknown>
+  const deadlinesAnalysis = (analysis.deadlines ?? {}) as Record<string, unknown>
+
+  const caseRef = (ident.claim_reference_number as string) || 'Case #ID-440291'
+  const billed = financial.billed_amount as number | undefined
+  const paid = financial.insurer_paid_amount as number | undefined
+  const denied = financial.denied_amount as number | undefined
+  const prob = typeof approval.score === 'number' ? Math.round(approval.score * 100) : 84
+  const isErisa = planCtx.regulation_type === 'erisa'
+
+  const internal = deadlinesAnalysis.internal_appeal as Record<string, unknown> | undefined
+  const external = deadlinesAnalysis.external_review as Record<string, unknown> | undefined
+  const internalDate = internal?.date as string | undefined
+  const externalDate = external?.date as string | undefined
+  const intPart = parsePart(internalDate)
+  const extPart = parsePart(externalDate)
+
+  useEffect(() => {
+    if (!bundle) return
+    postActionChecklist(bundle.claim_object, bundle.analysis, bundle.enrichment)
+      .then(res => {
+        const raw = res.steps ?? []
+        if (!raw.length) {
+          setSteps(DEFAULT_STEPS)
+          return
+        }
+        const mapped: StepRow[] = raw.map((s, i) => ({
+          num: Number(s.number ?? i + 1),
+          title: String(s.action ?? ''),
+          ...(i === 0 ? { tag: 'Critical', tagClass: 'bg-primary-fixed text-on-primary-fixed' } : {}),
+          desc: String(s.detail ?? ''),
+          why: String(s.why ?? ''),
+          active: i === 0,
+        }))
+        setSteps(mapped)
+      })
+      .catch(() => setSteps(DEFAULT_STEPS))
+
+    postDeadlines(bundle.claim_object, bundle.analysis)
+      .then(r => setDeadlineInfo(r.deadlines ?? []))
+      .catch(() => setDeadlineInfo([]))
+  }, [bundle])
+
+  async function downloadIcs(which: 'internal' | 'external') {
+    const row =
+      which === 'internal'
+        ? deadlineInfo.find(d => d.type === 'internal_appeal')
+        : deadlineInfo.find(d => d.type === 'external_review')
+    const date =
+      which === 'internal' ? internalDate : externalDate
+    if (row?.ics_data) {
+      const blob = new Blob([row.ics_data], { type: 'text/calendar' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `deadline-${which}.ics`
+      a.click()
+      URL.revokeObjectURL(a.href)
+      return
+    }
+    if (!date) return
+    try {
+      const blob = await postExportIcs({
+        event_title: which === 'internal' ? 'Internal appeal deadline' : 'External review deadline',
+        event_date: date.slice(0, 10),
+        description: String(row?.source_law ?? ''),
+        reminder_days_before: [30, 7],
+      })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `deadline-${which}.ics`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch {
+      /* keep UI unchanged on failure */
+    }
+  }
+
+  const carcHint = Array.isArray(denial.carc_codes) && denial.carc_codes.length
+    ? String(denial.carc_codes[0])
+    : 'CO-197'
 
   return (
     <div className="bg-background text-on-surface antialiased min-h-screen flex flex-col">
@@ -49,20 +169,20 @@ export default function ActionPlan() {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-[10px] uppercase tracking-widest font-bold">
               <span className="material-symbols-outlined text-sm">priority_high</span>
-              Time-Sensitive
+              {severityLabel(analysis.severity_triage as string | undefined)}
             </div>
             <h1 className="text-5xl font-extrabold font-headline tracking-tighter text-primary">Action Plan &amp; Deadlines</h1>
             <p className="text-on-surface-variant max-w-2xl leading-relaxed">
-              Your comprehensive recovery roadmap for Case #ID-440291. We have identified specific regulatory paths based on Indiana state law and ERISA guidelines.
+              Your comprehensive recovery roadmap for {caseRef}. We have identified specific regulatory paths based on Indiana state law and ERISA guidelines.
             </p>
           </div>
           <div className="glass-card p-6 rounded-xl border border-outline-variant/15 flex items-center gap-6">
             <div className="relative w-20 h-20">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                 <path className="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="100, 100" strokeWidth="3" />
-                <path className="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="84, 100" strokeLinecap="round" strokeWidth="3" />
+                <path className="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray={`${prob}, 100`} strokeLinecap="round" strokeWidth="3" />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center font-headline font-bold text-primary">84%</div>
+              <div className="absolute inset-0 flex items-center justify-center font-headline font-bold text-primary">{prob}%</div>
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant">Likelihood of Success</div>
@@ -83,9 +203,9 @@ export default function ActionPlan() {
                 </div>
                 <div className="space-y-4">
                   {[
-                    { label: 'Billed Amount', value: '$4,435.00', cls: '' },
-                    { label: 'Plan Paid', value: '$96.00', cls: 'text-emerald-700' },
-                    { label: 'Denied (Disputed)', value: '$4,250.00', cls: 'text-error' },
+                    { label: 'Billed Amount', value: fmtMoney(billed) === '—' ? '$4,435.00' : fmtMoney(billed), cls: '' },
+                    { label: 'Plan Paid', value: fmtMoney(paid) === '—' ? '$96.00' : fmtMoney(paid), cls: 'text-emerald-700' },
+                    { label: 'Denied (Disputed)', value: fmtMoney(denied) === '—' ? '$4,250.00' : fmtMoney(denied), cls: 'text-error' },
                   ].map(({ label, value, cls }) => (
                     <div key={label} className="flex justify-between items-center py-2 border-b border-surface-container">
                       <span className="text-on-surface-variant text-sm">{label}</span>
@@ -94,7 +214,7 @@ export default function ActionPlan() {
                   ))}
                   <div className="flex justify-between items-center pt-4">
                     <span className="text-primary font-bold">Disputed Gap</span>
-                    <span className="text-2xl font-extrabold text-primary">$4,250.00</span>
+                    <span className="text-2xl font-extrabold text-primary">{fmtMoney(denied) === '—' ? '$4,250.00' : fmtMoney(denied)}</span>
                   </div>
                 </div>
                 <button
@@ -111,7 +231,7 @@ export default function ActionPlan() {
                 <div className="relative z-10">
                   <h3 className="font-headline font-bold text-lg text-on-secondary-fixed-variant mb-4">Regulatory Routing</h3>
                   <div className="space-y-4">
-                    <div className="bg-white/50 p-4 rounded-lg">
+                    <div className={`bg-white/50 p-4 rounded-lg ${isErisa ? 'opacity-40 grayscale' : ''}`}>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="material-symbols-outlined text-sm">gavel</span>
                         <span className="text-xs font-bold uppercase tracking-widest text-on-secondary-fixed">Entity Determination</span>
@@ -119,7 +239,7 @@ export default function ActionPlan() {
                       <div className="text-xl font-extrabold text-on-secondary-fixed mb-1">IDOI (Indiana)</div>
                       <p className="text-sm text-on-secondary-fixed-variant leading-tight">This plan is fully insured and subject to IDOI IC 27-8-28 oversight.</p>
                     </div>
-                    <div className="opacity-40 grayscale pointer-events-none">
+                    <div className={`${isErisa ? '' : 'opacity-40 grayscale pointer-events-none'}`}>
                       <div className="text-xs font-bold uppercase tracking-widest text-on-secondary-fixed">Alternative: ERISA</div>
                       <div className="text-lg font-bold">US Dept of Labor</div>
                     </div>
@@ -170,26 +290,34 @@ export default function ActionPlan() {
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0 w-12 h-14 bg-error-container rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-[10px] font-bold text-on-error-container uppercase">Nov</span>
-                    <span className="text-xl font-extrabold text-on-error-container leading-none">12</span>
+                    <span className="text-[10px] font-bold text-on-error-container uppercase">{intPart.m}</span>
+                    <span className="text-xl font-extrabold text-on-error-container leading-none">{intPart.d}</span>
                   </div>
                   <div className="flex-grow">
                     <div className="text-sm font-bold text-primary">Internal Appeal Window</div>
-                    <div className="text-xs text-on-surface-variant">180 days from EOB receipt</div>
-                    <button className="mt-2 text-primary text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 hover:text-primary-container">
+                    <div className="text-xs text-on-surface-variant">{internal?.source ? String(internal.source) : '180 days from EOB receipt'}</div>
+                    <button
+                      type="button"
+                      onClick={() => void downloadIcs('internal')}
+                      className="mt-2 text-primary text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 hover:text-primary-container"
+                    >
                       <span className="material-symbols-outlined text-sm">calendar_add_on</span> Add to Calendar
                     </button>
                   </div>
                 </div>
                 <div className="flex gap-4">
                   <div className="flex-shrink-0 w-12 h-14 bg-surface-container rounded-lg flex flex-col items-center justify-center opacity-60">
-                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">Jan</span>
-                    <span className="text-xl font-extrabold text-on-surface-variant leading-none">28</span>
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">{extPart.m}</span>
+                    <span className="text-xl font-extrabold text-on-surface-variant leading-none">{extPart.d}</span>
                   </div>
                   <div className="flex-grow">
                     <div className="text-sm font-bold text-on-surface-variant">IDOI Filing Deadline</div>
                     <div className="text-xs text-on-surface-variant">External Review window</div>
-                    <button className="mt-2 text-primary text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void downloadIcs('external')}
+                      className="mt-2 text-primary text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"
+                    >
                       <span className="material-symbols-outlined text-sm">calendar_today</span> .ics Export
                     </button>
                   </div>
@@ -240,7 +368,7 @@ export default function ActionPlan() {
                 </div>
               </div>
               <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
-                "Based on your denial code (CO-197), I recommend prioritizing the medical record collection immediately."
+                &quot;Based on your denial code ({carcHint}), I recommend prioritizing the medical record collection immediately.&quot;
               </p>
               <button className="w-full py-2 border border-primary text-primary text-xs font-bold rounded uppercase tracking-widest hover:bg-primary hover:text-white transition-all">
                 Chat with Sarah

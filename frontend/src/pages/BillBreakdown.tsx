@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { loadAnalysisBundle } from '../lib/sessionKeys'
+import { postExportPdf } from '../lib/api'
 
 // ─── Demo data matching the ResultsDashboard claim ────────────────────────────
 
@@ -93,8 +95,8 @@ const LINE_ITEMS: LineItem[] = [
   },
 ]
 
-// Show only monetary line items for the table
-const MONETARY_ITEMS = LINE_ITEMS.filter(i => i.billed > 0 || i.denied > 0)
+// Show only monetary line items for the table (default table rows)
+const MONETARY_ITEMS_DEFAULT = LINE_ITEMS.filter(i => i.billed > 0 || i.denied > 0)
 
 // ─── Waterfall summary ────────────────────────────────────────────────────────
 
@@ -194,6 +196,58 @@ export default function BillBreakdown() {
   const navigate = useNavigate()
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
+  const bundle = useMemo(() => loadAnalysisBundle(), [])
+  const derived = useMemo(() => {
+    if (!bundle?.claim_object) {
+      return {
+        claimMeta: CLAIM_META,
+        totalBilled: TOTAL_BILLED,
+        networkAdjustment: NETWORK_ADJUSTMENT,
+        planPaid: PLAN_PAID,
+        copay: COPAY,
+        deniedDisputed: DENIED_DISPUTED,
+        patientResponsibility: PATIENT_RESPONSIBILITY,
+        allowedSum: 120,
+        prob: 78,
+        monetaryItems: MONETARY_ITEMS_DEFAULT,
+      }
+    }
+    const c = bundle.claim_object as Record<string, unknown>
+    const ident = (c.identification ?? {}) as Record<string, unknown>
+    const fin = (c.financial ?? {}) as Record<string, unknown>
+    const pp = (c.patient_provider ?? {}) as Record<string, unknown>
+    const analysis = (bundle.analysis ?? {}) as Record<string, unknown>
+    const ap = (analysis.approval_probability ?? {}) as Record<string, unknown>
+    const totalBilled = typeof fin.billed_amount === 'number' ? fin.billed_amount : TOTAL_BILLED
+    const planPaid = typeof fin.insurer_paid_amount === 'number' ? fin.insurer_paid_amount : PLAN_PAID
+    const deniedDisputed = typeof fin.denied_amount === 'number' ? fin.denied_amount : DENIED_DISPUTED
+    const copay = typeof fin.copay_amount === 'number' ? fin.copay_amount : COPAY
+    const patientResponsibility = typeof fin.patient_responsibility_total === 'number' ? fin.patient_responsibility_total : COPAY
+    const allowedSum = typeof fin.allowed_amount === 'number' ? fin.allowed_amount : 120
+    const networkAdjustment = Math.max(0, totalBilled - planPaid - deniedDisputed - patientResponsibility)
+    const prob = typeof ap.score === 'number' ? Math.round(ap.score * 100) : 78
+    const claimMeta = {
+      id: ident.claim_reference_number ? `#${String(ident.claim_reference_number)}` : CLAIM_META.id,
+      patient: (pp.patient_full_name as string) || CLAIM_META.patient,
+      provider: (pp.treating_provider_name as string) || CLAIM_META.provider,
+      insurer: CLAIM_META.insurer,
+      dateOfService: ident.date_of_service ? String(ident.date_of_service) : CLAIM_META.dateOfService,
+      dateOfDenial: ident.date_of_denial ? String(ident.date_of_denial) : CLAIM_META.dateOfDenial,
+    }
+    return {
+      claimMeta,
+      totalBilled,
+      networkAdjustment,
+      planPaid,
+      copay,
+      deniedDisputed,
+      patientResponsibility,
+      allowedSum,
+      prob,
+      monetaryItems: MONETARY_ITEMS_DEFAULT,
+    }
+  }, [bundle])
+
   function toggleRow(id: string) {
     setExpandedRows(prev => {
       const next = new Set(prev)
@@ -204,7 +258,21 @@ export default function BillBreakdown() {
   }
 
   function expandAll() {
-    setExpandedRows(new Set(MONETARY_ITEMS.map(i => i.id)))
+    setExpandedRows(new Set(derived.monetaryItems.map(i => i.id)))
+  }
+
+  async function exportPdf() {
+    const md = `# Bill breakdown\n\nClaim: ${derived.claimMeta.id}\nProvider: ${derived.claimMeta.provider}\n`
+    try {
+      const blob = await postExportPdf({ content: md, format: 'summary', title: 'Bill breakdown' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'bill-breakdown.pdf'
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch {
+      /* silent */
+    }
   }
 
   return (
@@ -227,9 +295,9 @@ export default function BillBreakdown() {
                   Bill Breakdown Explainer
                 </h1>
                 <div className="text-sm text-slate-600 space-y-0.5">
-                  <p>Claim <code className="font-mono bg-slate-100 px-1 rounded">{CLAIM_META.id}</code> · {CLAIM_META.dateOfService}</p>
-                  <p>Provider: {CLAIM_META.provider}</p>
-                  <p>Insurer: {CLAIM_META.insurer}</p>
+                  <p>Claim <code className="font-mono bg-slate-100 px-1 rounded">{derived.claimMeta.id}</code> · {derived.claimMeta.dateOfService}</p>
+                  <p>Provider: {derived.claimMeta.provider}</p>
+                  <p>Insurer: {derived.claimMeta.insurer}</p>
                 </div>
               </div>
               <div className="flex gap-3 shrink-0">
@@ -243,6 +311,7 @@ export default function BillBreakdown() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => void exportPdf()}
                   className="flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">download</span>
@@ -266,11 +335,11 @@ export default function BillBreakdown() {
               {/* Waterfall */}
               <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-0">
                 {[
-                  { label: 'Total Billed', value: TOTAL_BILLED, cls: 'text-on-surface', barClass: 'bg-slate-300', barPct: 100, desc: 'What the provider charged before any adjustments.' },
-                  { label: 'Network Adjustment', value: -NETWORK_ADJUSTMENT, cls: 'text-slate-500', barClass: 'bg-slate-200', barPct: (NETWORK_ADJUSTMENT / TOTAL_BILLED) * 100, desc: 'Discount negotiated by your insurer with in-network providers.' },
-                  { label: 'Plan Paid', value: PLAN_PAID, cls: 'text-emerald-700', barClass: 'bg-emerald-400', barPct: (PLAN_PAID / TOTAL_BILLED) * 100, desc: 'Amount your insurer paid for covered services.' },
-                  { label: 'Your Copay', value: -COPAY, cls: 'text-slate-500', barClass: 'bg-amber-300', barPct: (COPAY / TOTAL_BILLED) * 100, desc: 'Fixed amount you owe per visit under your plan terms.' },
-                  { label: 'Denied (Disputed)', value: DENIED_DISPUTED, cls: 'text-error font-extrabold', barClass: 'bg-red-400', barPct: (DENIED_DISPUTED / TOTAL_BILLED) * 100, desc: 'Amount denied due to missing prior authorization — subject to appeal.' },
+                  { label: 'Total Billed', value: derived.totalBilled, cls: 'text-on-surface', barClass: 'bg-slate-300', barPct: 100, desc: 'What the provider charged before any adjustments.' },
+                  { label: 'Network Adjustment', value: -derived.networkAdjustment, cls: 'text-slate-500', barClass: 'bg-slate-200', barPct: (derived.networkAdjustment / derived.totalBilled) * 100, desc: 'Discount negotiated by your insurer with in-network providers.' },
+                  { label: 'Plan Paid', value: derived.planPaid, cls: 'text-emerald-700', barClass: 'bg-emerald-400', barPct: (derived.planPaid / derived.totalBilled) * 100, desc: 'Amount your insurer paid for covered services.' },
+                  { label: 'Your Copay', value: -derived.copay, cls: 'text-slate-500', barClass: 'bg-amber-300', barPct: (derived.copay / derived.totalBilled) * 100, desc: 'Fixed amount you owe per visit under your plan terms.' },
+                  { label: 'Denied (Disputed)', value: derived.deniedDisputed, cls: 'text-error font-extrabold', barClass: 'bg-red-400', barPct: (derived.deniedDisputed / derived.totalBilled) * 100, desc: 'Amount denied due to missing prior authorization — subject to appeal.' },
                 ].map(({ label, value, cls, barClass, barPct, desc }) => (
                   <div key={label} className="group py-4 border-b border-slate-100 last:border-0">
                     <div className="flex justify-between items-center mb-1.5">
@@ -291,22 +360,22 @@ export default function BillBreakdown() {
               <div className="space-y-4">
                 <div className="bg-error-container border border-error/20 rounded-xl p-6">
                   <p className="text-xs font-bold text-error uppercase tracking-widest mb-1">Disputed Amount</p>
-                  <p className="text-4xl font-extrabold text-error mb-2">{fmt(DENIED_DISPUTED)}</p>
+                  <p className="text-4xl font-extrabold text-error mb-2">{fmt(derived.deniedDisputed)}</p>
                   <p className="text-sm text-on-error-container leading-relaxed">
                     This is the amount denied for CPT 62323 due to missing prior authorization. This is the most likely amount you can recover through appeal.
                   </p>
                   <div className="mt-4 flex items-center gap-2">
                     <span className="material-symbols-outlined text-emerald-600 text-sm">trending_up</span>
-                    <span className="text-xs font-bold text-emerald-700">78% appeal success rate for this denial type</span>
+                    <span className="text-xs font-bold text-emerald-700">{derived.prob}% appeal success rate for this denial type</span>
                   </div>
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Responsibility Breakdown</p>
                   {[
-                    { party: 'Your Insurer (Anthem)', amount: PLAN_PAID, color: 'bg-primary', pct: Math.round((PLAN_PAID / TOTAL_BILLED) * 100) },
-                    { party: 'You (patient)', amount: PATIENT_RESPONSIBILITY, color: 'bg-amber-400', pct: Math.round((PATIENT_RESPONSIBILITY / TOTAL_BILLED) * 100) },
-                    { party: 'Disputed / Denied', amount: DENIED_DISPUTED, color: 'bg-error', pct: Math.round((DENIED_DISPUTED / TOTAL_BILLED) * 100) },
+                    { party: 'Your Insurer (Anthem)', amount: derived.planPaid, color: 'bg-primary', pct: Math.round((derived.planPaid / derived.totalBilled) * 100) },
+                    { party: 'You (patient)', amount: derived.patientResponsibility, color: 'bg-amber-400', pct: Math.round((derived.patientResponsibility / derived.totalBilled) * 100) },
+                    { party: 'Disputed / Denied', amount: derived.deniedDisputed, color: 'bg-error', pct: Math.round((derived.deniedDisputed / derived.totalBilled) * 100) },
                   ].map(({ party, amount, color, pct }) => (
                     <div key={party} className="flex items-center gap-3 mb-3">
                       <div className={`w-3 h-3 rounded-full shrink-0 ${color}`} />
@@ -370,7 +439,7 @@ export default function BillBreakdown() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MONETARY_ITEMS.map(item => (
+                    {derived.monetaryItems.map(item => (
                       <LineItemRow
                         key={item.id}
                         item={item}
@@ -382,11 +451,11 @@ export default function BillBreakdown() {
                   <tfoot>
                     <tr className="bg-slate-50 border-t-2 border-slate-300">
                       <td className="px-4 py-4 text-sm font-extrabold text-on-surface">TOTALS</td>
-                      <td className="px-4 py-4 text-right text-sm font-extrabold text-on-surface">{fmt(TOTAL_BILLED)}</td>
-                      <td className="px-4 py-4 text-right text-sm font-bold text-on-surface-variant">{fmt(120)}</td>
-                      <td className="px-4 py-4 text-right text-sm font-bold text-emerald-700">{fmt(PLAN_PAID)}</td>
-                      <td className="px-4 py-4 text-right text-sm font-extrabold text-error">{fmt(DENIED_DISPUTED)}</td>
-                      <td className="px-4 py-4 text-right text-sm font-bold text-on-surface">{fmt(PATIENT_RESPONSIBILITY)}</td>
+                      <td className="px-4 py-4 text-right text-sm font-extrabold text-on-surface">{fmt(derived.totalBilled)}</td>
+                      <td className="px-4 py-4 text-right text-sm font-bold text-on-surface-variant">{fmt(derived.allowedSum)}</td>
+                      <td className="px-4 py-4 text-right text-sm font-bold text-emerald-700">{fmt(derived.planPaid)}</td>
+                      <td className="px-4 py-4 text-right text-sm font-extrabold text-error">{fmt(derived.deniedDisputed)}</td>
+                      <td className="px-4 py-4 text-right text-sm font-bold text-on-surface">{fmt(derived.patientResponsibility)}</td>
                       <td />
                     </tr>
                   </tfoot>
@@ -444,7 +513,7 @@ export default function BillBreakdown() {
             <div>
               <h3 className="text-xl font-bold text-on-primary mb-1">Ready to fight this denial?</h3>
               <p className="text-on-primary/80 text-sm">
-                Your appeal success odds are <strong className="text-on-primary">78%</strong>. The Action Plan has your step-by-step roadmap.
+                Your appeal success odds are <strong className="text-on-primary">{derived.prob}%</strong>. The Action Plan has your step-by-step roadmap.
               </p>
             </div>
             <div className="flex gap-3 shrink-0">
