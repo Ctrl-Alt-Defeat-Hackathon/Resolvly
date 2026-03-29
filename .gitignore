@@ -19,5 +19,17 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Temporary documentation (optional - remove if you want to commit these)
+# DOCKER_TEST_RESULTS.md
+# CHANGES_SUMMARY.md
+# CHANGES_FINAL.md
+# TESTING_GUIDE.md
+# SMART_RETRY_LOGIC.md
+# OLLAMA_SETUP_QUICK.md
+
 # Local frontend backup snapshot (not shipped with the app)
 frontend.local.bak

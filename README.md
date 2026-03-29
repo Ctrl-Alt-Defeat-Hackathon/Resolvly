@@ -2,8 +2,6 @@
 
 > An AI-powered platform that decodes insurance denials, fetches live regulations, and generates ready-to-send appeal letters — in under 20 seconds.
 
----
-
 ## The Problem
 
 Insurance denial letters are deliberately opaque. They contain codes like `CO-197`, dates, and legal citations that most patients have never seen before. Without knowing what those codes mean, which laws apply to their specific plan, and what steps to take within which deadlines, most patients simply give up — leaving billions of dollars in legitimate claims unpaid every year.
@@ -20,8 +18,11 @@ Resolvly takes the documents a patient already has — a denial letter, an Expla
 - Python 3.11+
 - Node.js 18+
 - At least one LLM API key: [Groq](https://console.groq.com) (recommended, free) or [Google Gemini](https://aistudio.google.com)
+- Docker (optional, for containerized deployment)
 
-### Backend
+### Option 1: Local Development
+
+#### Backend
 
 ```bash
 cd backend
@@ -32,12 +33,12 @@ pip install -r requirements.txt
 cp .env.example .env
 # Add your GROQ_API_KEY or GEMINI_API_KEY to .env
 
-python main.py
+uvicorn main:app --reload
 # API available at http://localhost:8000
 # Swagger docs at http://localhost:8000/docs
 ```
 
-### Frontend
+#### Frontend
 
 ```bash
 cd frontend
@@ -45,6 +46,20 @@ npm install
 npm run dev
 # App available at http://localhost:5173
 ```
+
+### Option 2: Docker
+
+```bash
+cp backend/.env.example backend/.env
+# Add your GROQ_API_KEY or GEMINI_API_KEY to backend/.env
+
+docker-compose up --build
+# Frontend → http://localhost
+# Backend  → http://localhost:8000
+# API docs → http://localhost:8000/docs
+```
+
+Common commands: `docker-compose logs -f` · `docker-compose down` · `docker-compose up --build` (after code changes)
 
 ---
 
@@ -311,10 +326,15 @@ The Analysis Agent then uses all of this — plus the ClaimObject — to produce
 - **Calendar export (.ics)** — add appeal deadlines directly to Google Calendar, Outlook, or Apple Calendar with 30-day and 7-day reminders
 
 ### Infrastructure
-- SSE streaming endpoint for progressive rendering (backend ready)
-- Session-level output caching — navigating between pages is instant; no LLM calls repeated
-- Appeal letter prefetched in background so the Appeal Drafting page opens immediately
-- LLM fallback chain: Groq 70B → Groq 8B → Gemini 2.5 Flash → Gemini 2.5 Flash Lite
+- **Docker support** — containerized deployment with docker-compose for full stack
+- **SSE streaming endpoint** for progressive rendering (backend ready)
+- **Session-level output caching** — navigating between pages is instant; no LLM calls repeated
+- **Appeal letter prefetching** — background fetch so Appeal Drafting page opens immediately
+- **Smart LLM fallback chain:**
+  - Cloud: Groq 70B → Groq 8B → Gemini 2.5 Flash → Gemini 2.5 Flash Lite
+  - Local: Groq → Gemini → Ollama (instant fallback, no retries)
+- **Rate limiting** — sequential LLM calls with priority queuing to avoid 429 errors
+- **Health checks** — `/health` endpoint for monitoring and auto-restart
 
 ---
 
@@ -327,6 +347,50 @@ The system uses LLMs for three specific tasks only:
 3. **Output generation** — writing the appeal letter, summary, action checklist, and provider brief
 
 All code lookups, regulation fetches, deadline calculations, completeness checks, probability estimation, and routing logic are **deterministic** — no LLM involved. This keeps costs low and results auditable.
+
+---
+
+## Deployment
+
+### Render (Backend)
+
+1. Connect your GitHub repository to Render
+2. Create new Web Service
+3. Configure:
+   - **Root Directory:** `backend`
+   - **Runtime:** Docker
+   - **Health Check Path:** `/health`
+4. Add environment variables (see `backend/.env.example`)
+5. Deploy
+
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions.
+
+### Vercel (Frontend)
+
+1. Import your GitHub repository to Vercel
+2. Configure:
+   - **Root Directory:** `frontend`
+   - **Framework Preset:** Vite
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+3. Deploy
+
+The `vercel.json` file will be auto-detected.
+
+### Docker (Self-Hosted)
+
+```bash
+# Build and start both services
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed instructions.
 
 ---
 
