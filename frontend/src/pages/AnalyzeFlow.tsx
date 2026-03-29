@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { uploadDocuments, extractEntities, analyzeClaim, wizardPlanType } from '../lib/api'
+import { buildPlanContext, buildWizardBody, canSubmitPlan } from '../lib/planMapping'
+import { STORAGE_KEYS, saveAnalysisBundle } from '../lib/sessionKeys'
 
-export const RESOLVLY_ANALYSIS_COMPLETE_KEY = 'resolvly_analysis_complete'
+export const RESOLVLY_ANALYSIS_COMPLETE_KEY = STORAGE_KEYS.ANALYSIS_COMPLETE
 
 // ─── Uploaded file (stitching list) ─────────────────────────────────────────
 export type DocKind = 'eob' | 'denial' | 'medical_bill'
@@ -21,6 +24,7 @@ interface UploadedFile {
   type: string
   status: 'extracted' | 'processing' | 'failed'
   docKind: DocKind
+  file?: File
 }
 
 function baseNameForKind(k: DocKind): string {
@@ -47,10 +51,6 @@ function normalizeFileNames(files: UploadedFile[]): UploadedFile[] {
   })
 }
 
-function mockSizeForIndex(index: number): string {
-  return `${2 + (index % 3)} pages · ${(1.2 + index * 0.3).toFixed(1)} MB`
-}
-
 // ─── Processing (after Begin Forensic Analysis) ──────────────────────────────
 const PIPELINE_STAGES = [
   { id: 'extraction', label: 'Document text extracted', detail: null as string[] | null },
@@ -66,20 +66,44 @@ const PIPELINE_STAGES = [
   { id: 'generating', label: 'Generating your results', detail: null },
 ]
 
-function ProcessingView({ onNext }: { onNext: () => void }) {
+function ProcessingView({
+  onComplete,
+  onError,
+  runPipeline,
+  errorText,
+}: {
+  onComplete: () => void
+  onError: (msg: string) => void
+  runPipeline: () => Promise<void>
+  errorText: string | null
+}) {
   const [completedCount, setCompletedCount] = useState(0)
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    if (completedCount < PIPELINE_STAGES.length) {
-      const delay = completedCount === 0 ? 800 : completedCount < 3 ? 1200 : 1500
-      const t = setTimeout(() => setCompletedCount(c => c + 1), delay)
-      return () => clearTimeout(t)
+    let iv: ReturnType<typeof setInterval> | undefined
+    const t = window.setTimeout(() => {
+      iv = setInterval(() => {
+        setCompletedCount(c => Math.min(c + 1, PIPELINE_STAGES.length - 1))
+      }, 1400)
+    }, 400)
+    ;(async () => {
+      try {
+        await runPipeline()
+        clearInterval(iv)
+        setCompletedCount(PIPELINE_STAGES.length)
+        setDone(true)
+        window.setTimeout(() => onComplete(), 1200)
+      } catch (e) {
+        clearInterval(iv)
+        onError(e instanceof Error ? e.message : String(e))
+      }
+    })()
+    return () => {
+      clearTimeout(t)
+      if (iv) clearInterval(iv)
     }
-    const t = setTimeout(() => { setDone(true) }, 1000)
-    const t2 = setTimeout(() => onNext(), 2500)
-    return () => { clearTimeout(t); clearTimeout(t2) }
-  }, [completedCount, onNext])
+  }, [runPipeline, onComplete, onError])
 
   const progress = Math.round((completedCount / PIPELINE_STAGES.length) * 100)
 
@@ -87,10 +111,12 @@ function ProcessingView({ onNext }: { onNext: () => void }) {
     <div className="max-w-2xl mx-auto px-6 py-12 w-full">
       <header className="mb-10 text-center">
         <h1 className="text-4xl font-extrabold font-headline text-primary tracking-tight mb-3">
-          {done ? 'Analysis Complete!' : 'Analyzing your claim...'}
+          {done ? 'Analysis Complete!' : errorText ? 'Analysis failed' : 'Analyzing your claim...'}
         </h1>
         <p className="text-on-surface-variant">
-          {done ? 'Loading your results...' : 'This usually takes 10–15 seconds.'}
+          {errorText
+            ? <span className="text-red-600">{errorText}</span>
+            : (done ? 'Loading your results...' : 'This usually takes 10–15 seconds.')}
         </p>
       </header>
 
@@ -130,7 +156,7 @@ function ProcessingView({ onNext }: { onNext: () => void }) {
             )
           })}
 
-          {done && (
+          {done && !errorText && (
             <div className="pt-4 flex items-center gap-3 text-emerald-600 font-semibold">
               <span className="material-symbols-outlined">check_circle</span>
               All complete! Loading your results...
@@ -150,7 +176,7 @@ export default function AnalyzeFlow() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const extractionTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [pipelineError, setPipelineError] = useState<string | null>(null)
 
   const [planType, setPlanType] = useState<string>('')
   const [funding, setFunding] = useState<string>('')
@@ -163,44 +189,24 @@ export default function AnalyzeFlow() {
     }
   }, [navigate])
 
-  useEffect(() => {
-    return () => {
-      extractionTimersRef.current.forEach(t => clearTimeout(t))
-      extractionTimersRef.current.clear()
-    }
-  }, [])
-
-  /** Each upload starts as processing, then completes to 100% on a staggered timer (per file). */
-  useEffect(() => {
-    files.forEach(f => {
-      if (f.status !== 'processing') return
-      if (extractionTimersRef.current.has(f.id)) return
-      const idx = files.findIndex(x => x.id === f.id)
-      const delay = 800 + Math.max(0, idx) * 600
-      const tid = window.setTimeout(() => {
-        extractionTimersRef.current.delete(f.id)
-        setFiles(prev =>
-          prev.map(x => (x.id === f.id ? { ...x, status: 'extracted' } : x))
-        )
-      }, delay)
-      extractionTimersRef.current.set(f.id, tid)
-    })
-  }, [files])
-
-  function addMockFile() {
+  function addFilesFromList(fileList: FileList | null) {
+    if (!fileList?.length) return
     setFiles(prev => {
-      if (prev.length >= 5) return prev
-      const id = crypto.randomUUID()
-      const index = prev.length
-      const raw: UploadedFile = {
-        id,
-        name: '',
-        size: mockSizeForIndex(index),
-        type: typeLabelForKind(nextUploadKind),
-        status: 'processing',
-        docKind: nextUploadKind,
-      }
-      return normalizeFileNames([...prev, raw])
+      let next = [...prev]
+      Array.from(fileList).forEach(file => {
+        if (next.length >= 5) return
+        const kind = nextUploadKind
+        next.push({
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          type: typeLabelForKind(kind),
+          status: 'extracted',
+          docKind: kind,
+          file,
+        })
+      })
+      return normalizeFileNames(next)
     })
   }
 
@@ -220,7 +226,7 @@ export default function AnalyzeFlow() {
         medical_bill: files.some(f => f.docKind === 'medical_bill'),
       },
     }
-    sessionStorage.setItem('resolvly_doc_profile', JSON.stringify(payload))
+    sessionStorage.setItem(STORAGE_KEYS.DOC_PROFILE, JSON.stringify(payload))
   }
 
   function fileProgress(f: UploadedFile) {
@@ -229,7 +235,65 @@ export default function AnalyzeFlow() {
     return '18%'
   }
 
-  const canAnalyze = files.length > 0
+  const onProcessingComplete = useCallback(() => {
+    sessionStorage.setItem(RESOLVLY_ANALYSIS_COMPLETE_KEY, '1')
+    const payload = {
+      files: files.map(f => ({ id: f.id, name: f.name, docKind: f.docKind })),
+      kindsPresent: {
+        eob: files.some(f => f.docKind === 'eob'),
+        denial: files.some(f => f.docKind === 'denial'),
+        medical_bill: files.some(f => f.docKind === 'medical_bill'),
+      },
+    }
+    sessionStorage.setItem(STORAGE_KEYS.DOC_PROFILE, JSON.stringify(payload))
+    navigate('/action-plan')
+  }, [navigate, files])
+
+  const runPipeline = useCallback(async () => {
+    const plan_context = buildPlanContext(planType, funding)
+    const fileBlobs = files.map(f => f.file).filter((x): x is File => !!x)
+    if (fileBlobs.length === 0) {
+      throw new Error('Each file must be a real upload from your device.')
+    }
+    const up = await uploadDocuments(fileBlobs)
+    const documents = up.documents.map(d => ({
+      doc_id: d.doc_id,
+      text_extracted: d.text_extracted,
+    }))
+    const ext = await extractEntities({
+      upload_id: up.upload_id,
+      documents,
+      plan_context: plan_context as Record<string, unknown>,
+    })
+    let wizard: Record<string, unknown> | null = null
+    try {
+      const wb = buildWizardBody(planType, funding)
+      const payload: Record<string, string> =
+        wb.source === 'employer'
+          ? { source: wb.source, state: wb.state, employer_plan_type: wb.employer_plan_type }
+          : { source: wb.source, state: wb.state }
+      wizard = await wizardPlanType(payload as { source: string; state: string; employer_plan_type?: string })
+    } catch {
+      wizard = null
+    }
+    const analyzed = await analyzeClaim(
+      ext.claim_object as Record<string, unknown>,
+      plan_context as Record<string, unknown>
+    )
+    saveAnalysisBundle({
+      claim_object: analyzed.claim_object,
+      analysis: analyzed.analysis,
+      enrichment: analyzed.enrichment,
+      sources: analyzed.sources,
+      plan_context: plan_context as Record<string, unknown>,
+      wizard,
+    })
+  }, [files, planType, funding])
+
+  const canAnalyze =
+    files.length > 0 &&
+    files.every(f => !!f.file) &&
+    canSubmitPlan(planType, funding)
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col">
@@ -238,11 +302,10 @@ export default function AnalyzeFlow() {
         <main className="flex-grow w-full min-w-0">
           {phase === 'processing' ? (
             <ProcessingView
-              onNext={() => {
-                sessionStorage.setItem(RESOLVLY_ANALYSIS_COMPLETE_KEY, '1')
-                persistDocProfileForResults()
-                navigate('/action-plan')
-              }}
+              errorText={pipelineError}
+              runPipeline={runPipeline}
+              onError={setPipelineError}
+              onComplete={onProcessingComplete}
             />
           ) : (
             <div className="flex-grow pt-8 pb-12 px-6 md:px-12 lg:px-24">
@@ -361,12 +424,22 @@ export default function AnalyzeFlow() {
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
                         onDragOver={e => { e.preventDefault(); setDragging(true) }}
                         onDragLeave={() => setDragging(false)}
-                        onDrop={e => { e.preventDefault(); setDragging(false); addMockFile() }}
+                        onDrop={e => { e.preventDefault(); setDragging(false); addFilesFromList(e.dataTransfer.files) }}
                         onClick={() => inputRef.current?.click()}
                         className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-6 group transition-colors cursor-pointer bg-surface/50
                           ${dragging ? 'border-primary bg-blue-50/80' : 'border-outline-variant hover:border-primary'}`}
                       >
-                        <input ref={inputRef} type="file" className="hidden" multiple accept=".pdf,.jpg,.png" onChange={() => addMockFile()} />
+                        <input
+                          ref={inputRef}
+                          type="file"
+                          className="hidden"
+                          multiple
+                          accept=".pdf,.jpg,.png"
+                          onChange={e => {
+                            addFilesFromList(e.target.files)
+                            e.target.value = ''
+                          }}
+                        />
                         <div className={`w-16 h-16 rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform
                           ${dragging ? 'bg-primary text-white' : 'bg-secondary-container'}`}>
                           <span className="material-symbols-outlined text-3xl">upload_file</span>
@@ -440,6 +513,7 @@ export default function AnalyzeFlow() {
                         disabled={!canAnalyze}
                         onClick={() => {
                           if (!canAnalyze) return
+                          setPipelineError(null)
                           persistDocProfileForResults()
                           setPhase('processing')
                         }}
