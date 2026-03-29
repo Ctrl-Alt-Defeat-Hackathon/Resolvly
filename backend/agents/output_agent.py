@@ -25,6 +25,42 @@ from tools.llm_client import complete_llm
 logger = logging.getLogger(__name__)
 
 
+def _repair_truncated_json(raw: str) -> str:
+    """
+    Attempt to repair truncated or malformed JSON responses.
+    Common issues: unterminated strings, missing closing braces.
+    """
+    repaired = raw.strip()
+    
+    # If JSON is truncated, try to close it
+    if repaired and not repaired.endswith('}'):
+        # Count opening and closing braces
+        open_braces = repaired.count('{')
+        close_braces = repaired.count('}')
+        if open_braces > close_braces:
+            # Try to close unterminated string first
+            if repaired.count('"') % 2 != 0:
+                repaired += '"'
+            # Then close braces
+            repaired += '}' * (open_braces - close_braces)
+    
+    # Handle unterminated arrays
+    open_brackets = repaired.count('[')
+    close_brackets = repaired.count(']')
+    if open_brackets > close_brackets:
+        # Try to close unterminated string first
+        if repaired.count('"') % 2 != 0:
+            repaired += '"'
+        repaired += ']' * (open_brackets - close_brackets)
+        # May need closing braces after arrays
+        open_braces = repaired.count('{')
+        close_braces = repaired.count('}')
+        if open_braces > close_braces:
+            repaired += '}' * (open_braces - close_braces)
+    
+    return repaired
+
+
 # ---------------------------------------------------------------------------
 # Output models
 # ---------------------------------------------------------------------------
@@ -208,7 +244,7 @@ Example shape:
   "key_points": ["...", "...", "..."]
 }}
 """
-    raw = await complete_llm(prompt, expect_json=True)
+    raw = await complete_llm(prompt, expect_json=True, priority=5)  # Normal priority for summaries
     if not raw:
         return SummaryOutput(
             summary_text="Unable to generate summary — LLM service unavailable.",
@@ -466,11 +502,12 @@ Each responsible_party must be exactly one of: "patient", "provider", "insurer".
 DOI Contact info: {json.dumps(doi_contact)}
 Internal appeal deadline: {deadlines.get('internal_appeal', {}).get('date', 'Unknown')} ({deadlines.get('internal_appeal', {}).get('days_remaining', '?')} days remaining)
 """
-    raw = await complete_llm(prompt, expect_json=True)
+    raw = await complete_llm(prompt, expect_json=True, priority=4)  # High priority for action checklist
     parsed_steps: list[ActionStep] = []
     if raw:
         try:
-            data = json.loads(raw)
+            repaired = _repair_truncated_json(raw)
+            data = json.loads(repaired)
             parsed_steps = _action_steps_from_parsed_json(data)
         except json.JSONDecodeError as e:
             logger.warning(f"Output Agent: checklist JSON invalid: {e}")
@@ -564,7 +601,7 @@ Return a JSON object with exactly:
   ]
 }}
 """
-    raw = await complete_llm(prompt, expect_json=True)
+    raw = await complete_llm(prompt, expect_json=True, priority=3)  # High priority for appeal letters
     if not raw:
         fallback_letter = _fallback_appeal_letter(patient_name, patient_address, ident, laws_text, appeal_address, internal_deadline, root_cause)
         return AppealLetterOutput(
@@ -574,11 +611,27 @@ Return a JSON object with exactly:
             legal_citations=[],
         )
     try:
-        data = json.loads(raw)
-        return AppealLetterOutput(**data)
+        repaired = _repair_truncated_json(raw)
+        data = json.loads(repaired)
+        
+        # Validate that we have actual content, not just the prompt
+        appeal_text = data.get('appeal_letter', '')
+        if isinstance(appeal_text, str) and len(appeal_text) > 100:
+            return AppealLetterOutput(**data)
+        else:
+            logger.warning("Appeal letter content too short or missing, using fallback")
+            raise ValueError("Invalid appeal letter content")
+            
     except Exception as e:
         logger.error(f"Output Agent: failed to parse appeal letter JSON: {e}")
-        return AppealLetterOutput(appeal_letter=raw)
+        # Use fallback instead of returning raw (which might be malformed)
+        fallback_letter = _fallback_appeal_letter(patient_name, patient_address, ident, laws_text, appeal_address, internal_deadline, root_cause)
+        return AppealLetterOutput(
+            appeal_letter=fallback_letter,
+            provider_message=f"Dear Billing Department,\n\nI am writing regarding claim {ident.get('claim_reference_number', 'Unknown')} which was denied. Please provide any documentation needed to support an appeal.\n\nThank you,\n{patient_name}",
+            insurer_message=f"Dear Member Services,\n\nI am writing to appeal the denial of claim {ident.get('claim_reference_number', 'Unknown')}. Please confirm receipt of this appeal.\n\nThank you,\n{patient_name}",
+            legal_citations=[],
+        )
 
 
 async def generate_provider_brief(
@@ -640,7 +693,7 @@ Make the brief concise, professional, and immediately actionable. Return a JSON 
   "pdf_ready": true
 }}
 """
-    raw = await complete_llm(prompt, expect_json=True)
+    raw = await complete_llm(prompt, expect_json=True, priority=6)  # Lower priority for provider briefs
     if not raw:
         return ProviderBriefOutput(
             brief_text="## Provider Brief\n\nUnable to generate provider brief — LLM service unavailable.\n\nPlease review the claim details and contact the patient.",
@@ -1133,7 +1186,7 @@ Generate a routing card in this exact Markdown structure (fill in the details):
 
 Keep it concise, clear, and actionable. Use plain English — no jargon.
 """
-    raw = await complete_llm(prompt, expect_json=False)
+    raw = await complete_llm(prompt, expect_json=False, priority=7)  # Lower priority for routing cards
     if not raw:
         # Return a deterministic fallback card
         lines = [

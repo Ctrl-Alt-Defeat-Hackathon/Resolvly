@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { analysisBundleFingerprint, loadAnalysisBundle } from '../lib/sessionKeys'
+import { postExportIcs } from '../lib/api'
 import {
-  postActionChecklist,
-  postCompletenessReport,
-  postDeadlines,
-  postExportIcs,
-  postProviderBrief,
-  postRoutingCard,
-  postSummary,
-} from '../lib/api'
+  getCachedActionChecklist,
+  getCachedCompleteness,
+  getCachedDeadlines,
+  getCachedProviderBrief,
+  getCachedRoutingCard,
+  getCachedSummary,
+} from '../lib/outputsCache'
 
 type StepRow = {
   num: number
@@ -231,7 +231,7 @@ export default function ActionPlan() {
     setRoutingState({ loading: true, error: null, data: null })
     setCompletenessState({ loading: true, error: null, data: null })
     setProviderBriefState({ loading: true, error: null, brief_text: '' })
-    postRoutingCard(bundle.claim_object, bundle.analysis, bundle.enrichment)
+    getCachedRoutingCard(bundle.claim_object, bundle.analysis, bundle.enrichment)
       .then(data => setRoutingState({ loading: false, error: null, data }))
       .catch(() =>
         setRoutingState({
@@ -240,7 +240,7 @@ export default function ActionPlan() {
           data: null,
         })
       )
-    postCompletenessReport(bundle.claim_object, bundle.analysis, bundle.enrichment)
+    getCachedCompleteness(bundle.claim_object, bundle.analysis, bundle.enrichment)
       .then(data => setCompletenessState({ loading: false, error: null, data }))
       .catch(() =>
         setCompletenessState({
@@ -250,7 +250,7 @@ export default function ActionPlan() {
         })
       )
 
-    postProviderBrief(bundle.claim_object, bundle.analysis, bundle.enrichment)
+    getCachedProviderBrief(bundle.claim_object, bundle.analysis, bundle.enrichment)
       .then(res =>
         setProviderBriefState({
           loading: false,
@@ -267,7 +267,7 @@ export default function ActionPlan() {
       )
 
     setSummaryState(s => ({ ...s, loading: true, error: null }))
-    postSummary(bundle.claim_object, bundle.analysis, bundle.enrichment)
+    getCachedSummary(bundle.claim_object, bundle.analysis, bundle.enrichment)
       .then(res =>
         setSummaryState({
           loading: false,
@@ -287,7 +287,7 @@ export default function ActionPlan() {
         })
       )
 
-    postActionChecklist(bundle.claim_object, bundle.analysis, bundle.enrichment)
+    getCachedActionChecklist(bundle.claim_object, bundle.analysis, bundle.enrichment)
       .then(res => {
         const raw = res.steps ?? []
         if (!raw.length) {
@@ -306,7 +306,7 @@ export default function ActionPlan() {
       })
       .catch(() => setSteps(FALLBACK_STEPS))
 
-    postDeadlines(bundle.claim_object, bundle.analysis)
+    getCachedDeadlines(bundle.claim_object, bundle.analysis)
       .then(r => setDeadlineInfo(r.deadlines ?? []))
       .catch(() => setDeadlineInfo([]))
   }, [bundle, bundleFingerprint])

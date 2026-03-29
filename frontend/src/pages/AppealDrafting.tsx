@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { analysisBundleFingerprint, loadAnalysisBundle } from '../lib/sessionKeys'
-import { postAppealLetter, postAssumptionsPanel, postExportPdf } from '../lib/api'
+import { postExportPdf } from '../lib/api'
+import { getCachedAppealLetter, getCachedAssumptions } from '../lib/outputsCache'
 
 /** Maps to AppealLetterRequest.patient_info — backend uses name, address, phone, email */
 function buildPatientInfo(claim: Record<string, unknown>): Record<string, string> {
@@ -62,7 +63,7 @@ export default function AppealDrafting() {
       return
     }
     setAssumptionsState(s => ({ ...s, loading: true, error: null }))
-    postAssumptionsPanel(bundle.claim_object, bundle.analysis, bundle.enrichment)
+    getCachedAssumptions(bundle.claim_object, bundle.analysis, bundle.enrichment)
       .then(res => {
         setAssumptionsState({
           loading: false,
@@ -84,7 +85,7 @@ export default function AppealDrafting() {
 
     setDraftLoading(true)
     const patientInfo = buildPatientInfo(bundle.claim_object)
-    postAppealLetter(bundle.claim_object, bundle.analysis, bundle.enrichment, patientInfo)
+    getCachedAppealLetter(bundle.claim_object, bundle.analysis, bundle.enrichment, patientInfo)
       .then(r => {
         setDrafts([
           typeof r.appeal_letter === 'string' && r.appeal_letter.trim()

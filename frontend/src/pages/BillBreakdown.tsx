@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { analysisBundleFingerprint, loadAnalysisBundle } from '../lib/sessionKeys'
-import { getCodeLookup, postExportPdf, postProbability, postSummary } from '../lib/api'
+import { getCodeLookup, postExportPdf } from '../lib/api'
+import { getCachedProbability, getCachedSummary } from '../lib/outputsCache'
 import {
   buildDenialCards,
   buildLineItemsFromClaim,
@@ -276,8 +277,8 @@ export default function BillBreakdown() {
     let cancelled = false
     setApiPanels(s => ({ ...s, loading: true }))
     Promise.all([
-      postSummary(bundle.claim_object, bundle.analysis, bundle.enrichment),
-      postProbability(bundle.claim_object, bundle.analysis, bundle.enrichment),
+      getCachedSummary(bundle.claim_object, bundle.analysis, bundle.enrichment),
+      getCachedProbability(bundle.claim_object, bundle.analysis, bundle.enrichment),
     ])
       .then(([sum, prob]) => {
         if (cancelled) return
