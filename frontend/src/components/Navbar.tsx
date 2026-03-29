@@ -1,11 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 // Pages shown only on the restricted pre-analysis pages (landing + analyze)
-const RESTRICTED_NAV = [{ label: 'Upload Wizard', to: '/analyze' }]
+const RESTRICTED_NAV: Array<{ label: string; to: string }> = []
 
 // Full nav shown once the user has reached the analysis flow
 const FULL_NAV = [
-  { label: 'Upload Wizard', to: '/analyze' },
   { label: 'Action Plan', to: '/action-plan' },
   { label: 'Appeal Drafting', to: '/appeal-drafting' },
   { label: 'Indiana Resources', to: '/indiana-resources' },
@@ -54,9 +53,6 @@ export default function Navbar() {
               Get Started
             </button>
           )}
-          <button className="text-sky-900 font-medium text-sm hover:opacity-80">
-            Sign In
-          </button>
         </div>
       </div>
     </nav>
