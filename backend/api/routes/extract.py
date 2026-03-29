@@ -7,7 +7,6 @@ Runs the full two-pass entity extraction pipeline:
 
 Supports multi-document stitching when multiple documents are provided.
 """
-from __future__ import annotations
 
 import logging
 from datetime import date
@@ -224,6 +223,10 @@ async def extract_entities(request: Request, body: ExtractRequest) -> ExtractRes
     claim.identification.claim_reference_number = raw.get("claim_reference_number")
     claim.identification.plan_policy_number = raw.get("plan_policy_number")
     claim.identification.group_number = raw.get("group_number")
+    if raw.get("date_of_denial"):
+        claim.identification.date_of_denial = _safe_parse_date(raw["date_of_denial"])
+    if raw.get("date_of_service"):
+        claim.identification.date_of_service = _safe_parse_date(raw["date_of_service"])
     if body.plan_context:
         claim.identification.plan_type = body.plan_context.plan_type
         claim.identification.erisa_or_state_regulated = body.plan_context.regulation_type

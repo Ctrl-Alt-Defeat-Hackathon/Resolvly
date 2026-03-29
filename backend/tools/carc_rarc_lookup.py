@@ -284,11 +284,21 @@ async def lookup_carc(code: str, group: str = "") -> CARCResult:
     Look up a CARC (Claim Adjustment Reason Code).
 
     Args:
-        code: The numeric CARC code (e.g., "50", "197")
+        code: The CARC code, with or without group prefix (e.g., "50", "CO-15", "PR 1")
         group: Optional group code (CO, PR, OA, PI, CR)
     """
-    code = code.strip().lstrip("0")  # Remove leading zeros
+    code = code.strip()
     group = group.strip().upper()
+
+    # Extract group prefix if embedded in code (e.g., "CO-15", "PR-1", "OA 45")
+    import re as _re
+    prefix_match = _re.match(r'^(CO|PR|OA|PI|CR)[-\s]?(\d+)$', code.upper())
+    if prefix_match:
+        if not group:
+            group = prefix_match.group(1)
+        code = prefix_match.group(2)
+
+    code = code.lstrip("0") or "0"  # Remove leading zeros, but keep "0" if that's all there is
 
     entry = _CARC_TABLE.get(code)
     if entry:

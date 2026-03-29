@@ -9,7 +9,6 @@ based on the user's answers to 3 questions, and returns:
   - applicable_laws (citations)
   - state_specific (DOI contact block + relevant state resources)
 """
-from __future__ import annotations
 
 import json
 from enum import Enum

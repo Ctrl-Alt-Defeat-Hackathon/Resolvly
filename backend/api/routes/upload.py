@@ -4,8 +4,6 @@ POST /api/v1/documents/upload
 Accepts up to 5 files (PDF, JPG, PNG), extracts text from digital PDFs,
 and returns per-document extraction results plus an upload_id for subsequent calls.
 """
-from __future__ import annotations
-
 import uuid
 from typing import Annotated
 

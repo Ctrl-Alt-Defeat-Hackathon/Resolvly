@@ -5,7 +5,6 @@ Standalone code lookup endpoint — resolves a single billing/denial/provider
 code to its authoritative description. Powers the "Search Library" feature
 on the frontend.
 """
-from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel

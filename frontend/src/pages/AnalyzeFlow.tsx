@@ -17,6 +17,27 @@ const DOC_KIND_LABEL: Record<DocKind, string> = {
   medical_bill: 'Medical bill',
 }
 
+const DOC_KIND_CONFIG: Record<DocKind, { icon: string; title: string; desc: string }> = {
+  denial: {
+    icon: 'cancel',
+    title: 'Denial Letter',
+    desc: 'The official denial notice from your insurer',
+  },
+  eob: {
+    icon: 'receipt_long',
+    title: 'Explanation of Benefits',
+    desc: 'EOB showing what your plan paid or denied',
+  },
+  medical_bill: {
+    icon: 'local_hospital',
+    title: 'Medical Bill',
+    desc: 'Bill or itemized statement from hospital or provider',
+  },
+}
+
+// The upload order we display cards in
+const DOC_KIND_ORDER: DocKind[] = ['denial', 'eob', 'medical_bill']
+
 interface UploadedFile {
   id: string
   name: string
@@ -37,18 +58,6 @@ function typeLabelForKind(k: DocKind): string {
   if (k === 'denial') return 'Denial Letter'
   if (k === 'eob') return 'Explanation of Benefits'
   return 'Medical Bill'
-}
-
-/** File names always follow the selected document type (e.g. EOB.pdf, Denial_Letter.pdf). */
-function normalizeFileNames(files: UploadedFile[]): UploadedFile[] {
-  const counts: Record<DocKind, number> = { eob: 0, denial: 0, medical_bill: 0 }
-  return files.map(f => {
-    counts[f.docKind]++
-    const n = counts[f.docKind]
-    const base = baseNameForKind(f.docKind)
-    const name = n === 1 ? `${base}.pdf` : `${base}_${n}.pdf`
-    return { ...f, name, type: typeLabelForKind(f.docKind) }
-  })
 }
 
 // ─── Processing (after Begin Forensic Analysis) ──────────────────────────────
@@ -168,20 +177,29 @@ function ProcessingView({
   )
 }
 
-// ─── Single-page Upload & Context Wizard (no horizontal stepper) ─────────────
+// ─── Single-page Upload & Context Wizard ────────────────────────────────────
 export default function AnalyzeFlow() {
   const navigate = useNavigate()
   const [phase, setPhase] = useState<'wizard' | 'processing'>('wizard')
 
   const [files, setFiles] = useState<UploadedFile[]>([])
-  const [dragging, setDragging] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  // Track which card is being dragged over (for per-card drag highlight)
+  const [draggingKind, setDraggingKind] = useState<DocKind | null>(null)
   const [pipelineError, setPipelineError] = useState<string | null>(null)
 
   const [planType, setPlanType] = useState<string>('')
   const [funding, setFunding] = useState<string>('')
-  /** Applies to the next file added via drop zone or file picker (can still change per row below). */
-  const [nextUploadKind, setNextUploadKind] = useState<DocKind>('denial')
+
+  // One hidden file input per document type
+  const denialRef = useRef<HTMLInputElement>(null)
+  const eobRef = useRef<HTMLInputElement>(null)
+  const medBillRef = useRef<HTMLInputElement>(null)
+
+  function getInputRef(kind: DocKind): React.RefObject<HTMLInputElement | null> {
+    if (kind === 'denial') return denialRef
+    if (kind === 'eob') return eobRef
+    return medBillRef
+  }
 
   useEffect(() => {
     if (sessionStorage.getItem(RESOLVLY_ANALYSIS_COMPLETE_KEY) === '1') {
@@ -189,32 +207,33 @@ export default function AnalyzeFlow() {
     }
   }, [navigate])
 
-  function addFilesFromList(fileList: FileList | null) {
+  /** Add (or replace) the file for the given document slot. Only the first file is used. */
+  function addFileForKind(kind: DocKind, fileList: FileList | null) {
     if (!fileList?.length) return
+    const file = fileList[0]
+    const base = baseNameForKind(kind)
     setFiles(prev => {
-      let next = [...prev]
-      Array.from(fileList).forEach(file => {
-        if (next.length >= 5) return
-        const kind = nextUploadKind
-        next.push({
-          id: crypto.randomUUID(),
-          name: file.name,
-          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-          type: typeLabelForKind(kind),
-          status: 'extracted',
-          docKind: kind,
-          file,
-        })
-      })
-      return normalizeFileNames(next)
+      // Replace any existing file for this kind
+      const filtered = prev.filter(f => f.docKind !== kind)
+      const newEntry: UploadedFile = {
+        id: crypto.randomUUID(),
+        name: `${base}.pdf`,
+        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        type: typeLabelForKind(kind),
+        status: 'extracted',
+        docKind: kind,
+        file,
+      }
+      return [...filtered, newEntry]
     })
   }
 
-  function setFileKind(id: string, docKind: DocKind) {
-    setFiles(prev => {
-      const next = prev.map(file => (file.id === id ? { ...file, docKind } : file))
-      return normalizeFileNames(next)
-    })
+  function removeFileByKind(kind: DocKind) {
+    setFiles(prev => prev.filter(f => f.docKind !== kind))
+  }
+
+  function getFileForKind(kind: DocKind): UploadedFile | undefined {
+    return files.find(f => f.docKind === kind)
   }
 
   function persistDocProfileForResults() {
@@ -227,12 +246,6 @@ export default function AnalyzeFlow() {
       },
     }
     sessionStorage.setItem(STORAGE_KEYS.DOC_PROFILE, JSON.stringify(payload))
-  }
-
-  function fileProgress(f: UploadedFile) {
-    if (f.status === 'extracted') return '100%'
-    if (f.status === 'failed') return '0%'
-    return '18%'
   }
 
   const onProcessingComplete = useCallback(() => {
@@ -290,10 +303,14 @@ export default function AnalyzeFlow() {
     })
   }, [files, planType, funding])
 
-  const canAnalyze =
-    files.length > 0 &&
-    files.every(f => !!f.file) &&
-    canSubmitPlan(planType, funding)
+  // All 3 document types must be uploaded, plus plan selections filled
+  const allDocsUploaded = DOC_KIND_ORDER.every(k => !!getFileForKind(k)?.file)
+  const canAnalyze = allDocsUploaded && canSubmitPlan(planType, funding)
+
+  // What's still missing (for helper text near the button)
+  const missingDocs = DOC_KIND_ORDER.filter(k => !getFileForKind(k))
+  const missingPlan = !planType
+  const missingFunding = planType === 'employer' && !funding
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col">
@@ -326,6 +343,7 @@ export default function AnalyzeFlow() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
 
+                  {/* ── Left column: Policy Intelligence ── */}
                   <section className="lg:col-span-4 space-y-6 min-w-0">
                     <div className="bg-surface-container-low p-8 rounded-xl space-y-8">
                       <div className="space-y-2">
@@ -394,119 +412,136 @@ export default function AnalyzeFlow() {
                     </div>
                   </section>
 
+                  {/* ── Right column: Document Upload ── */}
                   <section className="lg:col-span-8 flex flex-col gap-6 min-w-0 w-full">
-                    <div className="flex flex-col gap-3">
-                      <p className="text-sm font-semibold text-on-surface">What are you uploading next?</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(Object.keys(DOC_KIND_LABEL) as DocKind[]).map(k => (
-                          <button
-                            key={k}
-                            type="button"
-                            onClick={() => setNextUploadKind(k)}
-                            className={`px-4 py-2 rounded-full text-sm font-bold transition-all border
-                              ${nextUploadKind === k
-                                ? 'bg-primary text-white border-primary shadow-md'
-                                : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30 hover:border-primary/40'}`}
-                          >
-                            {DOC_KIND_LABEL[k]}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-on-surface-variant">
-                        The next file you add will be tagged accordingly; you can change any file in the list below.
+
+                    <div className="space-y-2">
+                      <h2 className="text-xl font-bold font-headline text-primary">Upload Your Documents</h2>
+                      <p className="text-sm text-on-surface-variant">
+                        All three documents are required for a complete forensic analysis. Click each card to upload the corresponding file.
                       </p>
                     </div>
 
-                    <div className="bg-surface-container-lowest p-1 rounded-2xl shadow-sm border border-outline-variant/10">
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
-                        onDragOver={e => { e.preventDefault(); setDragging(true) }}
-                        onDragLeave={() => setDragging(false)}
-                        onDrop={e => { e.preventDefault(); setDragging(false); addFilesFromList(e.dataTransfer.files) }}
-                        onClick={() => inputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-6 group transition-colors cursor-pointer bg-surface/50
-                          ${dragging ? 'border-primary bg-blue-50/80' : 'border-outline-variant hover:border-primary'}`}
-                      >
-                        <input
-                          ref={inputRef}
-                          type="file"
-                          className="hidden"
-                          multiple
-                          accept=".pdf,.jpg,.png"
-                          onChange={e => {
-                            addFilesFromList(e.target.files)
-                            e.target.value = ''
-                          }}
-                        />
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform
-                          ${dragging ? 'bg-primary text-white' : 'bg-secondary-container'}`}>
-                          <span className="material-symbols-outlined text-3xl">upload_file</span>
-                        </div>
-                        <div className="space-y-2">
-                          <h3 className="text-xl font-bold font-headline text-on-surface">Drop denial letters or policy docs here</h3>
-                          <p className="text-on-surface-variant max-w-sm mx-auto">
-                            Upload multiple PDFs. Our engine will automatically stitch them into a chronological medical history.
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-4 justify-center">
-                          <button type="button" onClick={e => { e.stopPropagation(); inputRef.current?.click() }} className="px-6 py-2 bg-surface-container-high rounded-full font-bold text-sm text-primary hover:bg-surface-dim transition-colors">
-                            Select Files
-                          </button>
-                          <button type="button" onClick={e => e.stopPropagation()} className="px-6 py-2 text-sm font-bold text-on-surface-variant hover:text-primary transition-colors">
-                            Import from IDOI Portal
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    {/* ── 3 Document Upload Cards ── */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {DOC_KIND_ORDER.map(kind => {
+                        const config = DOC_KIND_CONFIG[kind]
+                        const uploaded = getFileForKind(kind)
+                        const isUploaded = !!uploaded
+                        const isDraggingOver = draggingKind === kind
 
-                    {files.length > 0 && (
-                      <div className="bg-surface-container-low p-6 rounded-xl space-y-4">
-                        <div className="flex justify-between items-center gap-2">
-                          <h4 className="text-xs font-bold tracking-widest text-primary uppercase">Stitching Progress</h4>
-                          <span className="text-xs font-bold text-on-surface-variant whitespace-nowrap">
-                            {files.length} Document{files.length === 1 ? '' : 's'} Detected
-                          </span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant">
-                          Label each file so analysis can map EOB, denial, and billing data correctly.
-                        </p>
-                        <div className="space-y-3">
-                          {files.map(f => (
-                            <div key={f.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white rounded-lg border border-outline-variant/20">
-                              <span className="material-symbols-outlined text-secondary shrink-0 hidden sm:inline">description</span>
-                              <div className="flex-grow min-w-0 flex-1">
-                                <div className="text-xs font-bold text-on-surface truncate">{f.name}</div>
-                                <div className="h-1.5 w-full bg-surface-container rounded-full mt-1 overflow-hidden">
-                                  <div className="h-full bg-primary-container transition-all" style={{ width: fileProgress(f) }} />
+                        return (
+                          <div
+                            key={kind}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Upload ${config.title}`}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                getInputRef(kind).current?.click()
+                              }
+                            }}
+                            onDragOver={e => { e.preventDefault(); setDraggingKind(kind) }}
+                            onDragLeave={() => setDraggingKind(null)}
+                            onDrop={e => {
+                              e.preventDefault()
+                              setDraggingKind(null)
+                              addFileForKind(kind, e.dataTransfer.files)
+                            }}
+                            onClick={() => getInputRef(kind).current?.click()}
+                            className={`relative flex flex-col rounded-xl border-2 cursor-pointer transition-all duration-200 overflow-hidden
+                              ${isUploaded
+                                ? 'bg-emerald-50 border-emerald-400 shadow-sm'
+                                : isDraggingOver
+                                  ? 'bg-blue-50 border-primary border-solid scale-[1.02] shadow-md'
+                                  : 'bg-surface-container-lowest border-outline-variant/40 border-dashed hover:border-primary/60 hover:bg-primary/5'
+                              }`}
+                          >
+                            {/* Hidden file input for this slot */}
+                            <input
+                              ref={getInputRef(kind) as React.RefObject<HTMLInputElement>}
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={e => {
+                                addFileForKind(kind, e.target.files)
+                                e.target.value = ''
+                              }}
+                            />
+
+                            {isUploaded ? (
+                              /* ── Uploaded (green) state ── */
+                              <div className="flex flex-col h-full p-5 gap-3">
+                                <div className="flex items-start justify-between">
+                                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                                    <span className="material-symbols-outlined text-emerald-600 text-xl">check_circle</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove ${config.title}`}
+                                    onClick={e => { e.stopPropagation(); removeFileByKind(kind) }}
+                                    className="w-7 h-7 rounded-full bg-emerald-100 hover:bg-emerald-200 flex items-center justify-center transition-colors shrink-0"
+                                  >
+                                    <span className="material-symbols-outlined text-emerald-600 text-sm">close</span>
+                                  </button>
+                                </div>
+                                <div className="flex-grow min-w-0">
+                                  <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 mb-1">Uploaded</p>
+                                  <p className="font-bold text-sm text-emerald-900 leading-tight">{config.title}</p>
+                                  <p className="text-xs text-emerald-700 mt-2 truncate">{uploaded.name}</p>
+                                  <p className="text-xs text-emerald-500 mt-0.5">{uploaded.size}</p>
+                                </div>
+                                <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-auto">
+                                  <span className="material-symbols-outlined text-sm">edit</span>
+                                  Click to replace
+                                </p>
+                              </div>
+                            ) : (
+                              /* ── Empty (blue) state ── */
+                              <div className="flex flex-col items-center text-center p-5 py-8 gap-4 h-full">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors
+                                  ${isDraggingOver ? 'bg-primary text-white' : 'bg-primary/10'}`}>
+                                  <span className={`material-symbols-outlined text-2xl ${isDraggingOver ? 'text-white' : 'text-primary'}`}>
+                                    {config.icon}
+                                  </span>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-bold text-sm text-on-surface">{config.title}</p>
+                                  <p className="text-xs text-on-surface-variant leading-relaxed">{config.desc}</p>
+                                </div>
+                                <div className="mt-auto text-xs font-semibold text-primary flex items-center gap-1 pt-2">
+                                  <span className="material-symbols-outlined text-sm">upload</span>
+                                  {isDraggingOver ? 'Drop here' : 'Click or drag to upload'}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                                <label className="sr-only" htmlFor={`doc-kind-${f.id}`}>Document type</label>
-                                <select
-                                  id={`doc-kind-${f.id}`}
-                                  value={f.docKind}
-                                  onClick={e => e.stopPropagation()}
-                                  onChange={e => setFileKind(f.id, e.target.value as DocKind)}
-                                  className="w-full sm:w-[11rem] text-xs font-semibold border border-outline-variant rounded-lg px-2 py-2 bg-surface-container-lowest text-primary focus:ring-2 focus:ring-primary/30 focus:outline-none"
-                                >
-                                  {(Object.keys(DOC_KIND_LABEL) as DocKind[]).map(k => (
-                                    <option key={k} value={k}>{DOC_KIND_LABEL[k]}</option>
-                                  ))}
-                                </select>
-                                {f.status === 'extracted' ? (
-                                  <span className="material-symbols-outlined text-sm text-primary shrink-0" title="Processed">check_circle</span>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-on-surface-variant uppercase shrink-0 whitespace-nowrap">Analyzing...</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
 
+                    {/* ── Upload progress summary ── */}
+                    <div className="flex items-center gap-3 px-1">
+                      {DOC_KIND_ORDER.map(kind => {
+                        const isUploaded = !!getFileForKind(kind)
+                        return (
+                          <div key={kind} className="flex items-center gap-1.5 text-xs font-semibold">
+                            <span className={`material-symbols-outlined text-base ${isUploaded ? 'text-emerald-500' : 'text-slate-300'}`}>
+                              {isUploaded ? 'check_circle' : 'radio_button_unchecked'}
+                            </span>
+                            <span className={isUploaded ? 'text-emerald-700' : 'text-slate-400'}>
+                              {DOC_KIND_LABEL[kind]}
+                            </span>
+                          </div>
+                        )
+                      })}
+                      <span className="ml-auto text-xs text-on-surface-variant font-medium">
+                        {files.length}/3 uploaded
+                      </span>
+                    </div>
+
+                    {/* ── Begin Forensic Analysis button + helper text ── */}
                     <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 pt-2 w-full">
                       <button
                         type="button"
@@ -525,10 +560,37 @@ export default function AnalyzeFlow() {
                         Begin Forensic Analysis
                         <span className="material-symbols-outlined">analytics</span>
                       </button>
-                      <p className="text-xs text-on-surface-variant leading-tight text-center md:text-left md:max-w-sm md:pt-1">
-                        By clicking, you authorize Resolvly to process these documents under <br />
-                        <span className="font-bold">Indiana Health Insurance Advocacy standards.</span>
-                      </p>
+
+                      {/* Helper text explaining what's still needed */}
+                      <div className="text-xs text-on-surface-variant leading-relaxed text-center md:text-left md:max-w-xs md:pt-1 space-y-1">
+                        {!canAnalyze ? (
+                          <div className="space-y-1">
+                            {missingDocs.length > 0 && (
+                              <p className="text-amber-600 font-semibold flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">info</span>
+                                Still needed: {missingDocs.map(k => DOC_KIND_CONFIG[k].title).join(', ')}
+                              </p>
+                            )}
+                            {missingPlan && (
+                              <p className="text-amber-600 font-semibold flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">info</span>
+                                Select a plan type
+                              </p>
+                            )}
+                            {missingFunding && (
+                              <p className="text-amber-600 font-semibold flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">info</span>
+                                Select a funding structure
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p>
+                            By clicking, you authorize Resolvly to process these documents under{' '}
+                            <span className="font-bold">Indiana Health Insurance Advocacy standards.</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </section>
                 </div>
