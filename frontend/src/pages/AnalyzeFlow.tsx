@@ -612,7 +612,7 @@ export default function AnalyzeFlow() {
       <div className="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 h-16 flex items-center justify-around z-50">
         {[
           { icon: 'home', label: 'Home', to: '/', active: false },
-          { icon: 'upload_file', label: 'Wizard', to: '/analyze', active: true },
+          { icon: 'upload_file', label: 'Upload Wizard', to: '/analyze', active: true },
           { icon: 'gavel', label: 'Plan', to: '/action-plan', active: false },
           { icon: 'account_circle', label: 'Profile', to: '/', active: false },
         ].map(({ icon, label, active, to }) => (

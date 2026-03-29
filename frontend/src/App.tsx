@@ -1,6 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
-import UploadWizard from './pages/UploadWizard'
 import AnalyzeFlow from './pages/AnalyzeFlow'
 import ActionPlan from './pages/ActionPlan'
 import BillBreakdown from './pages/BillBreakdown'
@@ -14,7 +13,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/upload-wizard" element={<UploadWizard />} />
+        <Route path="/upload-wizard" element={<Navigate to="/analyze" replace />} />
         <Route path="/analyze" element={<AnalyzeFlow />} />
         <Route path="/action-plan" element={<ActionPlan />} />
         <Route path="/bill-breakdown" element={<BillBreakdown />} />

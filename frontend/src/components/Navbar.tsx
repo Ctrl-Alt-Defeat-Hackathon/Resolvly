@@ -1,21 +1,18 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
-// Pages shown only on the restricted pre-analysis pages (Landing + Upload)
-const RESTRICTED_NAV = [
-  { label: 'Landing Page', to: '/' },
-  { label: 'Upload Wizard', to: '/upload-wizard' },
-]
+// Pages shown only on the restricted pre-analysis pages (landing + analyze)
+const RESTRICTED_NAV = [{ label: 'Upload Wizard', to: '/analyze' }]
 
 // Full nav shown once the user has reached the analysis flow
 const FULL_NAV = [
-  { label: 'Upload', to: '/analyze' },
+  { label: 'Upload Wizard', to: '/analyze' },
   { label: 'Action Plan', to: '/action-plan' },
   { label: 'Appeal Drafting', to: '/appeal-drafting' },
   { label: 'Indiana Resources', to: '/indiana-resources' },
   { label: 'Code Lookup', to: '/code-lookup' },
 ]
 
-const RESTRICTED_PATHS = ['/', '/upload-wizard', '/analyze']
+const RESTRICTED_PATHS = ['/', '/analyze']
 
 export default function Navbar() {
   const { pathname } = useLocation()
@@ -49,9 +46,9 @@ export default function Navbar() {
           })}
         </div>
         <div className="flex items-center gap-4">
-          {isRestricted && pathname !== '/upload-wizard' && (
+          {isRestricted && pathname !== '/analyze' && (
             <button
-              onClick={() => navigate('/upload-wizard')}
+              onClick={() => navigate('/analyze')}
               className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg shadow-sm hover:opacity-90 transition-all"
             >
               Get Started
