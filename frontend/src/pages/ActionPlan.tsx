@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
@@ -34,6 +35,7 @@ const steps = [
 ]
 
 export default function ActionPlan() {
+  const navigate = useNavigate()
   const [openStep, setOpenStep] = useState<number | null>(null)
   const [reminders, setReminders] = useState({ weekly: true, urgent: true, regulatory: false })
 
@@ -81,8 +83,9 @@ export default function ActionPlan() {
                 </div>
                 <div className="space-y-4">
                   {[
-                    { label: 'Billed Amount', value: '$12,450.00', cls: '' },
-                    { label: 'Allowed Amount', value: '$1,200.00', cls: 'text-error' },
+                    { label: 'Billed Amount', value: '$4,435.00', cls: '' },
+                    { label: 'Plan Paid', value: '$96.00', cls: 'text-emerald-700' },
+                    { label: 'Denied (Disputed)', value: '$4,250.00', cls: 'text-error' },
                   ].map(({ label, value, cls }) => (
                     <div key={label} className="flex justify-between items-center py-2 border-b border-surface-container">
                       <span className="text-on-surface-variant text-sm">{label}</span>
@@ -91,9 +94,17 @@ export default function ActionPlan() {
                   ))}
                   <div className="flex justify-between items-center pt-4">
                     <span className="text-primary font-bold">Disputed Gap</span>
-                    <span className="text-2xl font-extrabold text-primary">$11,250.00</span>
+                    <span className="text-2xl font-extrabold text-primary">$4,250.00</span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/bill-breakdown')}
+                  className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 border border-primary text-primary text-xs font-bold rounded-lg hover:bg-primary hover:text-white transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">receipt_long</span>
+                  View Full Bill Breakdown
+                </button>
               </div>
 
               <div className="bg-secondary-container p-8 rounded-xl border border-outline-variant/15 relative overflow-hidden">

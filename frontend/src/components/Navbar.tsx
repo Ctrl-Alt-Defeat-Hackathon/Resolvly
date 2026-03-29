@@ -8,15 +8,14 @@ const RESTRICTED_NAV = [
 
 // Full nav shown once the user has reached the analysis flow
 const FULL_NAV = [
-  { label: 'Landing Page', to: '/' },
-  { label: 'Upload Wizard', to: '/upload-wizard' },
+  { label: 'Upload', to: '/analyze' },
   { label: 'Action Plan', to: '/action-plan' },
   { label: 'Appeal Drafting', to: '/appeal-drafting' },
   { label: 'Indiana Resources', to: '/indiana-resources' },
   { label: 'Code Lookup', to: '/code-lookup' },
 ]
 
-const RESTRICTED_PATHS = ['/', '/upload-wizard']
+const RESTRICTED_PATHS = ['/', '/upload-wizard', '/analyze']
 
 export default function Navbar() {
   const { pathname } = useLocation()
