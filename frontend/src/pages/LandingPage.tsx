@@ -9,8 +9,9 @@ export default function LandingPage() {
     <div className="bg-background text-on-background selection:bg-secondary-container min-h-screen flex flex-col">
       <Navbar />
 
+      <main className="flex-grow pt-24 pb-12">
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-8 max-w-7xl mx-auto">
+      <section className="pb-20 editorial-margin">
         <div className="grid lg:grid-cols-[1fr_400px] gap-16 items-center">
           <div className="space-y-8">
             <span className="inline-block px-3 py-1 bg-secondary-container text-on-secondary-container text-[10px] uppercase tracking-widest font-bold rounded-full">
@@ -64,7 +65,7 @@ export default function LandingPage() {
 
       {/* Pipeline Section */}
       <section className="py-24 bg-surface-container-low">
-        <div className="max-w-7xl mx-auto px-8">
+        <div className="editorial-margin">
           <div className="mb-16">
             <h2 className="text-4xl font-extrabold text-primary mb-4 tracking-tight">Proprietary Resolution Pipeline</h2>
             <div className="w-24 h-1.5 bg-primary rounded-full"></div>
@@ -103,7 +104,7 @@ export default function LandingPage() {
       </section>
 
       {/* Security & Compliance */}
-      <section className="py-24 px-8 max-w-7xl mx-auto">
+      <section className="py-24 editorial-margin">
         <div className="grid md:grid-cols-2 gap-12">
           <div className="relative overflow-hidden rounded-[2rem] bg-surface-container-lowest p-12 border border-outline-variant/10 group">
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-secondary-container/30 rounded-full blur-3xl group-hover:bg-secondary-container/50 transition-colors"></div>
@@ -153,8 +154,8 @@ export default function LandingPage() {
       </section>
 
       {/* Indiana Visual Anchor */}
-      <section className="py-12 px-8">
-        <div className="max-w-7xl mx-auto rounded-3xl overflow-hidden h-[400px] relative">
+      <section className="py-12 editorial-margin">
+        <div className="rounded-3xl overflow-hidden h-[400px] relative">
           <img
             alt="Indiana Landscape"
             className="w-full h-full object-cover grayscale"
@@ -176,6 +177,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      </main>
 
       <Footer disclaimer="Legal Disclaimer: Resolvly is an advocacy software platform and does not constitute a law firm or medical provider. We do not provide legal advice or clinical diagnoses. Our analysis is based on provided documentation and publicly available Indiana Department of Insurance regulatory frameworks." />
     </div>

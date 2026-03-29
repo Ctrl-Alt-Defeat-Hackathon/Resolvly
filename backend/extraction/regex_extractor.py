@@ -125,6 +125,131 @@ def _extract_currencies(text: str) -> list[float]:
     return amounts
 
 
+_MONEY_CAP = r"([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|[0-9]+\.[0-9]{2})"
+
+
+def _parse_money_cap(s: str) -> float | None:
+    s = s.strip().replace(",", "")
+    if not s:
+        return None
+    try:
+        v = float(s)
+        return v if v >= 0 else None
+    except ValueError:
+        return None
+
+
+def _first_labeled_amount(text: str, patterns: list[str]) -> float | None:
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE | re.MULTILINE)
+        if m:
+            v = _parse_money_cap(m.group(1))
+            if v is not None:
+                return v
+    return None
+
+
+def extract_labeled_financials(text: str) -> dict[str, float]:
+    """
+    Map common EOB / denial / hospital-bill labels to structured financial fields.
+    This fixes gaps where Pass 1 only had positional currency_amounts[0]/[1] and
+    Pass 2 (LLM) is skipped — insurer_paid, copay, etc. were never set by regex alone.
+    """
+    # fmt: off
+    labeled: dict[str, float] = {}
+
+    billed = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)(?:total\s+)?(?:billed|charge(?:d)?|submitted|amount\s+charged)[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)(?:charge|billed)\s+amount[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)total\s+charges?[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if billed is not None:
+        labeled["billed_amount"] = billed
+
+    allowed = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)(?:contracted|allowed)\s+(?:amount|rate)?[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)eligible\s+amount[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if allowed is not None:
+        labeled["allowed_amount"] = allowed
+
+    paid = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)plan\s+paid[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)(?:insurance|plan|payer|ins\.?)\s+(?:paid|payment|pay)\s*(?:amount)?[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)(?:amount\s+)?paid\s+by\s+(?:insurance|plan|payer)[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)payer\s+responsibility\s+paid[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)payment\s+from\s+(?:insurance|plan)[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)net\s+paid[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if paid is not None:
+        labeled["insurer_paid_amount"] = paid
+
+    denied = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)(?:amount\s+)?denied[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)disallowed[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)(?:not\s+covered|uncovered)(?:\s+amount)?[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)denial\s+amount[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if denied is not None:
+        labeled["denied_amount"] = denied
+
+    copay = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)co[-\s]?pay(?:ment)?[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)copay[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if copay is not None:
+        labeled["copay_amount"] = copay
+
+    coins = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)co[-\s]?insurance[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)coinsurance[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if coins is not None:
+        labeled["coinsurance_amount"] = coins
+
+    ded = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)deductible(?:\s+applied)?[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if ded is not None:
+        labeled["deductible_applied"] = ded
+
+    pr = _first_labeled_amount(
+        text,
+        [
+            rf"(?i)patient\s+responsibility[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)(?:your|member)\s+responsibility[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)(?:you\s+owe|balance\s+due|amount\s+you\s+owe)[:\s]+\$?\s*{_MONEY_CAP}",
+            rf"(?i)member\s+liability[:\s]+\$?\s*{_MONEY_CAP}",
+        ],
+    )
+    if pr is not None:
+        labeled["patient_responsibility_total"] = pr
+
+    # fmt: on
+    return labeled
+
+
 def _extract_icd10(text: str) -> list[str]:
     candidates = re.findall(_PATTERNS["icd10"], text)
     return list(dict.fromkeys(c.upper() for c in candidates if _ICD10_RE.match(c.upper())))
@@ -274,6 +399,7 @@ def extract_pass1(text: str) -> dict[str, Any]:
 
         # Financial
         "currency_amounts": currencies,
+        "financial_labeled": extract_labeled_financials(text),
 
         # Denial codes — CARC pattern has 2 groups: (explicit-prefix, group-prefix)
         "carc_codes": _extract_carc(text),

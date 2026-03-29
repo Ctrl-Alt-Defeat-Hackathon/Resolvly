@@ -1,0 +1,18 @@
+---
+description: Google Stitch MCP + UI direction for Resolvly frontend
+globs: frontend/**/*
+---
+
+# Stitch MCP (Google)
+
+- Project MCP config: copy `.cursor/mcp.json.example` → `.cursor/mcp.json`, set `X-Goog-Api-Key` to your Stitch API key from [Stitch settings](https://stitch.withgoogle.com), then reload Cursor MCP.
+- When the **stitch** MCP tools are available in chat, prefer them for new screens, layout variants, and component structure before hand-rolling large UI blocks.
+- Never commit real API keys; keep secrets in local `mcp.json` only (gitignored) or Cursor MCP UI.
+
+# Stitch-inspired product UI (Resolvly)
+
+- **Feel:** Calm, trustworthy, healthcare-adjacent — not alarming; generous whitespace; soft elevation.
+- **Shape:** Rounded corners (`--radius` ≥ 0.75rem), cards with subtle border + shadow on hover where interactive.
+- **Color:** Cool trust palette (blue–teal primary), warm neutrals for body; reserve strong red for true errors/denial states only.
+- **Type:** Clear hierarchy — short hero headline, supportive subcopy; avoid dense walls of text on marketing surfaces.
+- **Motion:** Minimal; prefer opacity/shadow over large movement.

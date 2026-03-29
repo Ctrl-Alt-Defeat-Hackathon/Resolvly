@@ -19,6 +19,17 @@ interface CodeLookupResult {
 
 // ─── Code type auto-detection ─────────────────────────────────────────────────
 
+function detectProcedureTypeFromInput(input: string): 'cpt' | 'hcpcs' | null {
+  const upper = input.trim().toUpperCase()
+  const stripped = upper.replace(/^(CPT|HCPCS|PROC(?:EDURE)?\s*CODE)\s*[:\s#-]*/i, '').trim()
+  const m = stripped.match(/\b([0-9]{4}[0-9A-Z]|[A-V][0-9]{4})\b/)
+  if (!m) return null
+  const tok = m[1].toUpperCase()
+  if (/^[0-9]{4}[0-9A-Z]$/.test(tok)) return 'cpt'
+  if (/^[A-V][0-9]{4}$/.test(tok)) return 'hcpcs'
+  return null
+}
+
 function detectCodeType(input: string): CodeType | null {
   const s = input.trim().toUpperCase()
   if (!s) return null
@@ -31,6 +42,10 @@ function detectCodeType(input: string): CodeType | null {
 
   // RARC: starts with N or M followed by optional letters then digits, or just MA/RA prefix
   if (/^(MA|RA|N|M)[A-Z]?\d{1,4}$/i.test(s)) return 'rarc'
+
+  // CPT / HCPCS (incl. "CPT 99213", "HCPCS A0425") before ICD-10
+  const proc = detectProcedureTypeFromInput(input)
+  if (proc) return proc
 
   // ICD-10: letter + 2 digits + optional dot + more chars (e.g. M54.5, G89.29, A01)
   if (/^[A-TV-Z]\d{2}(\.[0-9A-Z]{1,4})?$/i.test(s)) return 'icd10'
@@ -87,13 +102,17 @@ function ResultCard({ result, onDraftAppeal }: { result: CodeLookupResult; onDra
   if (!result.found) {
     return (
       <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
-        <div className="p-8 flex items-center gap-4">
-          <span className="material-symbols-outlined text-error text-3xl">search_off</span>
+        <div className="p-8 flex items-start gap-4">
+          <span className="material-symbols-outlined text-error text-3xl shrink-0">search_off</span>
           <div>
-            <p className="font-bold text-on-surface">Code not found: <code className="font-mono">{result.code}</code></p>
-            <p className="text-sm text-on-surface-variant mt-1">
-              This code could not be resolved. Try checking the spelling or selecting the code type manually.
-            </p>
+            <p className="font-bold text-on-surface">No match: <code className="font-mono">{result.code}</code></p>
+            {result.description ? (
+              <p className="text-sm text-on-surface-variant mt-2 leading-relaxed">{result.description}</p>
+            ) : (
+              <p className="text-sm text-on-surface-variant mt-1">
+                This code could not be resolved. Try checking the spelling or selecting the code type manually.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -270,7 +289,7 @@ export default function CodeLookupContent() {
   const activeType = selectedType ?? detectedType
 
   return (
-    <div className="max-w-6xl mx-auto bg-surface pb-8">
+    <div className="w-full bg-surface pb-8">
       <nav className="mb-8 flex items-center gap-2 text-on-surface-variant font-medium text-[10px] uppercase tracking-widest">
         <Link to="/indiana-resources" className="hover:text-primary transition-colors">
           Indiana Resources

@@ -6,6 +6,7 @@ from slowapi.errors import RateLimitExceeded
 
 from config import get_settings
 from api.routes import health, upload, extract, analyze, outputs, wizard, codes, export
+from api.routes.health import health_check
 
 settings = get_settings()
 
@@ -38,6 +39,17 @@ app.include_router(outputs.router, prefix="/api/v1/outputs", tags=["Outputs"])
 app.include_router(wizard.router, prefix="/api/v1/wizard", tags=["Wizard"])
 app.include_router(codes.router, prefix="/api/v1/codes", tags=["Codes"])
 app.include_router(export.router, prefix="/api/v1/export", tags=["Export"])
+
+
+@app.get("/")
+async def root():
+    return {"service": settings.app_name, "docs": "/docs", "health": "/health"}
+
+
+@app.get("/health")
+async def health_root():
+    """Same payload as GET /api/v1/health — for load balancers and quick curl to :8000/health."""
+    return await health_check()
 
 
 if __name__ == "__main__":

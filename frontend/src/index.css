@@ -81,8 +81,17 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-.editorial-margin { margin-left: 5%; }
-@media (min-width: 1024px) { .editorial-margin { margin-left: 8%; } }
+/* Symmetric horizontal inset (matches left and right) */
+.editorial-margin {
+  margin-left: 5%;
+  margin-right: 5%;
+}
+@media (min-width: 1024px) {
+  .editorial-margin {
+    margin-left: 8%;
+    margin-right: 8%;
+  }
+}
 
 body {
   margin: 0;

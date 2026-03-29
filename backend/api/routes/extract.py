@@ -3,7 +3,7 @@ POST /api/v1/documents/extract
 
 Runs the full two-pass entity extraction pipeline:
   Pass 1: Deterministic regex extraction (free, instant)
-  Pass 2: LLM-powered extraction via Gemini (contextual entities)
+  Pass 2: LLM-powered extraction via Groq/Gemini (contextual entities)
 
 Supports multi-document stitching when multiple documents are provided.
 """
@@ -243,11 +243,27 @@ async def extract_entities(request: Request, body: ExtractRequest) -> ExtractRes
     claim.service_billing.modifier_codes = raw.get("modifier_codes", [])
     claim.service_billing.place_of_service_code = raw.get("place_of_service_code")
 
-    # Financial — positional assignment from Pass 1 (overridden by Pass 2)
+    # Financial — labeled regex (Pass 1), then legacy positional $-amount order, then Pass 2 LLM
+    fl = raw.get("financial_labeled") or {}
+    for attr in (
+        "billed_amount",
+        "allowed_amount",
+        "insurer_paid_amount",
+        "denied_amount",
+        "patient_responsibility_total",
+        "copay_amount",
+        "coinsurance_amount",
+        "deductible_applied",
+    ):
+        val = fl.get(attr)
+        if val is not None:
+            setattr(claim.financial, attr, float(val))
+
     amounts = raw.get("currency_amounts", [])
-    if amounts:
-        claim.financial.billed_amount = amounts[0] if len(amounts) > 0 else None
-        claim.financial.denied_amount = amounts[1] if len(amounts) > 1 else None
+    if claim.financial.billed_amount is None and amounts:
+        claim.financial.billed_amount = amounts[0]
+    if claim.financial.denied_amount is None and len(amounts) > 1:
+        claim.financial.denied_amount = amounts[1]
 
     # Denial reason
     claim.denial_reason.carc_codes = raw.get("carc_codes", [])

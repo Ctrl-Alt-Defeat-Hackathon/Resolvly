@@ -1,14 +1,31 @@
+/** Official State of Indiana / IDOI / Medicaid documents (opens in a new tab). */
 const guides = [
-  { title: 'Indiana Patient Bill of Rights', size: 'PDF • 1.2 MB' },
-  { title: 'Claim Denial Checklist', size: 'PDF • 840 KB' },
-  { title: 'IDOI Complaint Form Guide', size: 'PDF • 2.1 MB' },
-  { title: 'Medicaid Appeals Handbook', size: 'PDF • 3.5 MB' },
+  {
+    title: 'Indiana Patient Bill of Rights',
+    meta: 'PDF · Indiana.gov (SPD)',
+    href: 'https://www.in.gov/spd/openenrollment/files/Rights-and-Protections-Against-Surprise-Medical-Bills.pdf',
+  },
+  {
+    title: 'Claim Denial Checklist',
+    meta: 'PDF · Indiana Medicaid',
+    href: 'https://www.in.gov/medicaid/providers/files/modules/provider-and-member-utilization-review.pdf',
+  },
+  {
+    title: 'IDOI Complaint Form Guide',
+    meta: 'PDF · IDOI',
+    href: 'https://www.in.gov/idoi/files/Provider_Complaint_form-12.20.21.pdf',
+  },
+  {
+    title: 'Medicaid Appeals Handbook',
+    meta: 'PDF · Indiana Medicaid',
+    href: 'https://www.in.gov/medicaid/providers/files/modules/claim-administrative-review-and-appeals.pdf',
+  },
 ]
 
 /** Main Indiana Resources library (hub) — nested under IndianaResourcesLayout. */
 export default function IndianaResourcesHub() {
   return (
-    <div className="max-w-6xl mx-auto bg-surface">
+    <div className="bg-surface w-full">
       <header className="mb-12">
         <div className="inline-block px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
           Regulatory Hub
@@ -49,7 +66,14 @@ export default function IndianaResourcesHub() {
                   Direct access to the Indiana Statutes regulating insurance companies, claim settlements, and unfair practices.
                 </p>
               </div>
-              <a href="#" className="mt-6 text-sm font-bold underline underline-offset-4 hover:text-white transition-colors">View Statutes</a>
+              <a
+                href="https://iga.in.gov/laws/2024/ic/titles/27"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 text-sm font-bold underline underline-offset-4 hover:text-white transition-colors"
+              >
+                View Statutes
+              </a>
             </div>
 
             <div className="bg-surface-container-low p-8 rounded-xl flex flex-col md:flex-row gap-6 items-center md:col-span-3 border border-outline-variant/10">
@@ -78,14 +102,19 @@ export default function IndianaResourcesHub() {
             <h2 className="text-2xl font-bold text-primary">Consumer Guides</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {guides.map(({ title, size }) => (
+            {guides.map(({ title, meta, href }) => (
               <div key={title} className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20 hover:border-primary/30 transition-all flex flex-col items-center text-center">
                 <span className="material-symbols-outlined text-primary text-4xl mb-4">picture_as_pdf</span>
                 <h4 className="text-sm font-bold text-primary mb-1">{title}</h4>
-                <p className="text-[10px] text-on-surface-variant mb-4">{size}</p>
-                <button type="button" className="w-full py-2 bg-surface-container-high text-primary text-xs font-bold rounded-lg hover:bg-primary hover:text-on-primary transition-colors">
+                <p className="text-[10px] text-on-surface-variant mb-4">{meta}</p>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-surface-container-high text-primary text-xs font-bold rounded-lg hover:bg-primary hover:text-on-primary transition-colors text-center"
+                >
                   Download
-                </button>
+                </a>
               </div>
             ))}
           </div>
@@ -105,7 +134,12 @@ export default function IndianaResourcesHub() {
                 <div>
                   <h4 className="font-bold text-primary mb-1">IDOI Complaint Portal</h4>
                   <p className="text-sm text-on-surface-variant mb-3">The official Indiana Department of Insurance portal for filing formal complaints against insurance carriers.</p>
-                  <a href="#" className="text-primary font-bold text-xs inline-flex items-center gap-1 hover:underline">
+                  <a
+                    href="https://www.in.gov/idoi/consumer-services/complaints/submit-a-complaint-online/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary font-bold text-xs inline-flex items-center gap-1 hover:underline"
+                  >
                     VISIT IN.GOV <span className="material-symbols-outlined text-sm">open_in_new</span>
                   </a>
                 </div>
@@ -117,7 +151,7 @@ export default function IndianaResourcesHub() {
                 <div>
                   <h4 className="font-bold text-primary mb-1">Consumer Assistance Hotline</h4>
                   <p className="text-sm text-on-surface-variant mb-3">Speak with an IDOI representative for immediate guidance on Indiana insurance regulations.</p>
-                  <a href="#" className="text-primary font-bold text-xs inline-flex items-center gap-1 hover:underline">
+                  <a href="tel:+18006224461" className="text-primary font-bold text-xs inline-flex items-center gap-1 hover:underline">
                     1-800-622-4461 <span className="material-symbols-outlined text-sm">phone_forwarded</span>
                   </a>
                 </div>

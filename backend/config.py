@@ -7,7 +7,11 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
 
-    # LLM
+    # LLM — Groq (OpenAI-compatible) preferred; Gemini optional fallback
+    groq_api_key: str = ""
+    groq_model_primary: str = "llama-3.3-70b-versatile"
+    groq_model_fallback: str = "llama-3.1-8b-instant"
+
     gemini_api_key: str = ""
     gemini_model_primary: str = "gemini-2.5-flash-preview-04-17"
     gemini_model_fallback: str = "gemini-2.0-flash"

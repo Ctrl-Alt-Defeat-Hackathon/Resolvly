@@ -63,15 +63,11 @@ function typeLabelForKind(k: DocKind): string {
 // ─── Processing (after Begin Forensic Analysis) ──────────────────────────────
 const PIPELINE_STAGES = [
   { id: 'extraction', label: 'Document text extracted', detail: null as string[] | null },
-  { id: 'entities', label: 'Entities identified (14 codes, 6 dates, 4 amounts)', detail: null },
-  { id: 'codes', label: 'Looking up billing codes...', detail: [
-    'CPT 62323 — found ✓',
-    'ICD-10 M54.5 — found ✓',
-    'CARC CO-197 — found ✓',
-  ]},
-  { id: 'federal', label: 'Searching federal regulations', detail: null },
-  { id: 'state', label: 'Checking Indiana state rules', detail: null },
-  { id: 'analysis', label: 'Running root cause analysis', detail: null },
+  { id: 'entities', label: 'Extracting claim identifiers, codes, dates, and amounts', detail: null },
+  { id: 'codes', label: 'Resolving billing and denial codes (CMS / authoritative references)', detail: null },
+  { id: 'federal', label: 'Searching federal regulations (eCFR)', detail: null },
+  { id: 'state', label: 'Checking state DOI resources and routing', detail: null },
+  { id: 'analysis', label: 'Running root cause and deadline analysis', detail: null },
   { id: 'generating', label: 'Generating your results', detail: null },
 ]
 
@@ -117,7 +113,7 @@ function ProcessingView({
   const progress = Math.round((completedCount / PIPELINE_STAGES.length) * 100)
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12 w-full">
+    <div className="max-w-2xl mx-auto w-full py-8">
       <header className="mb-10 text-center">
         <h1 className="text-4xl font-extrabold font-headline text-primary tracking-tight mb-3">
           {done ? 'Analysis Complete!' : errorText ? 'Analysis failed' : 'Analyzing your claim...'}
@@ -313,10 +309,10 @@ export default function AnalyzeFlow() {
   const missingFunding = planType === 'employer' && !funding
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col">
+    <div className="bg-background text-on-background selection:bg-secondary-container min-h-screen flex flex-col">
       <Navbar />
-      <div className="pt-16 flex flex-col flex-grow min-h-0">
-        <main className="flex-grow w-full min-w-0">
+      <main className="flex-grow w-full min-w-0 pt-24 pb-12">
+        <div className="editorial-margin">
           {phase === 'processing' ? (
             <ProcessingView
               errorText={pipelineError}
@@ -325,8 +321,7 @@ export default function AnalyzeFlow() {
               onComplete={onProcessingComplete}
             />
           ) : (
-            <div className="flex-grow pt-8 pb-12 px-6 md:px-12 lg:px-24">
-              <div className="max-w-6xl mx-auto w-full space-y-12">
+            <div className="w-full space-y-12">
 
                 <header className="max-w-3xl flex flex-col gap-4">
                   <div className="inline-flex shrink-0 items-center gap-2 self-start bg-secondary-container text-on-secondary-container px-3 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase">
@@ -609,10 +604,9 @@ export default function AnalyzeFlow() {
                   ))}
                 </div>
               </div>
-            </div>
           )}
-        </main>
-      </div>
+        </div>
+      </main>
       <Footer disclaimer="Resolvly is an advocacy platform and does not provide legal advice. Documents are processed for analysis purposes only." />
 
       <div className="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 h-16 flex items-center justify-around z-50">

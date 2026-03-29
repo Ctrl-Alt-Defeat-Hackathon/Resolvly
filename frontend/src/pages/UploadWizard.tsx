@@ -65,11 +65,11 @@ export default function UploadWizard() {
   }
 
   return (
-    <div className="bg-background text-on-background font-body min-h-screen flex flex-col">
+    <div className="bg-background text-on-background selection:bg-secondary-container font-body min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-grow pt-24 pb-12 px-6 md:px-12 lg:px-24">
-        <div className="max-w-6xl mx-auto space-y-12">
+      <main className="flex-grow pt-24 pb-12">
+        <div className="editorial-margin space-y-12">
 
           {/* Header */}
           <header className="max-w-3xl space-y-4">

@@ -185,9 +185,19 @@ def stitch_documents(
     # Second pass: fill in remaining fields from any source
     for _, _, raw in doc_extractions:
         for key, value in raw.items():
+            if key == "financial_labeled":
+                continue
             if key not in merged or merged[key] is None or merged[key] == "" or merged[key] == []:
                 merged[key] = value
             elif isinstance(merged[key], list) and isinstance(value, list):
                 merged[key] = _merge_value(merged[key], value)
+
+    # Labeled financials: union keys from all docs (EOB may have paid/copay; denial may have denied)
+    fl_merged: dict[str, float] = {}
+    for _, _, raw in doc_extractions:
+        for k, v in (raw.get("financial_labeled") or {}).items():
+            if k not in fl_merged:
+                fl_merged[k] = v
+    merged["financial_labeled"] = fl_merged
 
     return merged, warnings, doc_type_map

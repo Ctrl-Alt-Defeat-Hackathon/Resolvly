@@ -1,7 +1,7 @@
 """
 Pass 2 — LLM-Powered Entity Extraction.
 
-Uses Google Gemini 2.5 Flash with structured output to extract entities
+Uses Groq (preferred) or Google Gemini with structured JSON output to extract entities
 that require contextual understanding:
   - denial reason narratives
   - provider / patient names (NER)
@@ -20,10 +20,8 @@ import json
 import logging
 from typing import Any
 
-from google import genai
-from google.genai import types
-
 from config import get_settings
+from tools.llm_client import complete_llm
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +54,7 @@ def _build_user_prompt(text: str, pass1_results: dict[str, Any]) -> str:
 
     return f"""## Document Text
 
-{text[:15000]}
+{text[:80000]}
 
 ## Pass 1 (Regex) Extraction Results
 
@@ -89,38 +87,28 @@ async def extract_pass2(
     """
     Run LLM-powered entity extraction (Pass 2).
 
-    Takes raw document text and Pass 1 regex results, sends to Gemini
-    with a structured output prompt, and returns extracted fields.
-
-    Returns an empty dict if the API key is not configured or the call fails.
+    Returns an empty dict if no LLM API key is configured or the call fails.
     """
     settings = get_settings()
-
-    if not settings.gemini_api_key:
-        logger.warning("GEMINI_API_KEY not set — skipping Pass 2 LLM extraction")
+    if not settings.groq_api_key and not settings.gemini_api_key:
+        logger.warning("GROQ_API_KEY or GEMINI_API_KEY not set — skipping Pass 2 LLM extraction")
         return {}
 
-    client = genai.Client(api_key=settings.gemini_api_key)
     user_prompt = _build_user_prompt(text, pass1_results)
 
     try:
-        response = await client.aio.models.generate_content(
-            model=settings.gemini_model_primary,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM_PROMPT,
-                response_mime_type="application/json",
-                temperature=0.1,
-            ),
+        response_text = await complete_llm(
+            user_prompt,
+            expect_json=True,
+            system_instruction=_SYSTEM_PROMPT,
         )
 
-        if not response.text:
-            logger.warning("Gemini returned empty response for Pass 2 extraction")
+        if not response_text:
+            logger.warning("LLM returned empty response for Pass 2 extraction")
             return {}
 
-        result = json.loads(response.text)
+        result = json.loads(response_text)
 
-        # Clean up: remove null values and empty strings
         cleaned = {}
         for key, value in result.items():
             if value is not None and value != "" and value != []:
@@ -130,27 +118,8 @@ async def extract_pass2(
         return cleaned
 
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse Gemini JSON response: {e}")
+        logger.error(f"Failed to parse LLM JSON response for Pass 2: {e}")
         return {}
     except Exception as e:
-        logger.error(f"Gemini API call failed for Pass 2: {e}")
-        # Try fallback model
-        try:
-            response = await client.aio.models.generate_content(
-                model=settings.gemini_model_fallback,
-                contents=user_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=_SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    temperature=0.1,
-                ),
-            )
-            if response.text:
-                result = json.loads(response.text)
-                cleaned = {k: v for k, v in result.items() if v is not None and v != "" and v != []}
-                logger.info(f"Pass 2 (fallback model) extracted {len(cleaned)} fields")
-                return cleaned
-        except Exception as fallback_err:
-            logger.error(f"Fallback model also failed: {fallback_err}")
-
+        logger.error(f"LLM API call failed for Pass 2: {e}")
         return {}

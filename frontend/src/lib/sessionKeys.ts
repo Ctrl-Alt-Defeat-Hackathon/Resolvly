@@ -20,6 +20,16 @@ export type StoredAnalysisBundle = {
   wizard: Record<string, unknown> | null
 }
 
+/** Changes when claim / analysis / enrichment in sessionStorage updates (e.g. after a new /analyze run). */
+export function analysisBundleFingerprint(): string {
+  if (typeof sessionStorage === 'undefined') return ''
+  return [
+    sessionStorage.getItem(STORAGE_KEYS.CLAIM_OBJECT) ?? '',
+    sessionStorage.getItem(STORAGE_KEYS.ANALYSIS) ?? '',
+    sessionStorage.getItem(STORAGE_KEYS.ENRICHMENT) ?? '',
+  ].join('\x1e')
+}
+
 export function loadAnalysisBundle(): StoredAnalysisBundle | null {
   try {
     const claimRaw = sessionStorage.getItem(STORAGE_KEYS.CLAIM_OBJECT)
