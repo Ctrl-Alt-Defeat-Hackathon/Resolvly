@@ -1,0 +1,32 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import LandingPage from './pages/LandingPage'
+import AnalyzeFlow from './pages/AnalyzeFlow'
+import ActionPlan from './pages/ActionPlan'
+import BillBreakdown from './pages/BillBreakdown'
+import AppealDrafting from './pages/AppealDrafting'
+import IndianaResourcesLayout from './pages/IndianaResourcesLayout'
+import IndianaResourcesHub from './pages/IndianaResourcesHub'
+import CodeLookupContent from './pages/CodeLookupContent'
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/upload-wizard" element={<Navigate to="/analyze" replace />} />
+        <Route path="/analyze" element={<AnalyzeFlow />} />
+        <Route path="/action-plan" element={<ActionPlan />} />
+        <Route path="/bill-breakdown" element={<BillBreakdown />} />
+        <Route path="/appeal-drafting" element={<AppealDrafting />} />
+        <Route path="/indiana-resources" element={<IndianaResourcesLayout />}>
+          <Route index element={<IndianaResourcesHub />} />
+        </Route>
+        <Route path="/code-lookup" element={<IndianaResourcesLayout />}>
+          <Route index element={<CodeLookupContent />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  )
+}
+
+export default App
