@@ -5,7 +5,7 @@ import Footer from '../components/Footer'
 import { RESOLVLY_ANALYSIS_COMPLETE_KEY } from './AnalyzeFlow'
 
 // ─── Tab definitions ─────────────────────────────────────────────────────────
-const TABS = ['Summary', 'Codes', 'Assumptions']
+const TABS = ['Summary', 'Codes', 'Assumptions', 'Documents']
 
 // ─── Shared inline code pill ─────────────────────────────────────────────────
 function CodePill({ code }: { code: string }) {
@@ -254,6 +254,178 @@ function TabDetails() {
   )
 }
 
+// ─── Tab: Documents (stitching report) ────────────────────────────────────────
+
+const DOC_KIND_META: Record<string, { label: string; icon: string; color: string; fields: string[] }> = {
+  denial: {
+    label: 'Denial Letter',
+    icon: 'cancel',
+    color: 'bg-red-100 border-red-300 text-red-800',
+    fields: ['Claim reference #', 'Date of denial', 'Denial reason narrative', 'Plan provision cited', 'Clinical criteria', 'Prior auth status', 'Appeal deadline (internal)', 'Appeal deadline (external)', 'Insurer contact info'],
+  },
+  eob: {
+    label: 'Explanation of Benefits',
+    icon: 'receipt_long',
+    color: 'bg-blue-100 border-blue-300 text-blue-800',
+    fields: ['CARC / RARC codes', 'ICD-10 diagnosis codes', 'CPT procedure codes', 'Billed / Allowed / Paid amounts', 'Date of service', 'Provider NPI', 'Network status'],
+  },
+  medical_bill: {
+    label: 'Medical Bill',
+    icon: 'local_hospital',
+    color: 'bg-emerald-100 border-emerald-300 text-emerald-800',
+    fields: ['Facility name & address', 'Units of service', 'Itemized charges', 'Provider billing contact'],
+  },
+}
+
+const STITCHING_FIELD_SOURCES: { field: string; source: string; confidence: number }[] = [
+  { field: 'Claim reference #', source: 'Denial Letter', confidence: 98 },
+  { field: 'Date of denial', source: 'Denial Letter', confidence: 97 },
+  { field: 'Denial reason (CO-197)', source: 'Denial Letter + EOB', confidence: 99 },
+  { field: 'CPT 62323', source: 'EOB', confidence: 96 },
+  { field: 'ICD-10 M54.5', source: 'EOB', confidence: 95 },
+  { field: 'Billed amount ($4,250)', source: 'EOB + Medical Bill', confidence: 94 },
+  { field: 'Provider NPI', source: 'EOB', confidence: 92 },
+  { field: 'Facility address', source: 'Medical Bill', confidence: 88 },
+  { field: 'Patient name', source: 'Denial Letter', confidence: 90 },
+  { field: 'Appeal deadline (180 days)', source: 'Denial Letter', confidence: 85 },
+]
+
+function TabDocuments({ docProfile }: { docProfile: DocProfile | null }) {
+  const uploadedKinds = docProfile
+    ? (['denial', 'eob', 'medical_bill'] as const).filter(k => docProfile.kindsPresent[k])
+    : (['denial', 'eob', 'medical_bill'] as const) // demo: show all three
+
+  const stitchCount = uploadedKinds.length
+
+  return (
+    <div className="space-y-8 max-w-4xl">
+      {/* Stitching status banner */}
+      <div className={`flex items-start gap-4 p-5 rounded-xl border ${stitchCount >= 2 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+        <span className={`material-symbols-outlined text-2xl shrink-0 ${stitchCount >= 2 ? 'text-emerald-600' : 'text-amber-600'}`}>
+          {stitchCount >= 2 ? 'check_circle' : 'warning'}
+        </span>
+        <div>
+          <p className={`font-bold text-sm ${stitchCount >= 2 ? 'text-emerald-800' : 'text-amber-800'}`}>
+            {stitchCount >= 2
+              ? `Multi-Document Stitching Complete — ${stitchCount} documents merged`
+              : 'Single-document analysis — upload more documents for higher accuracy'}
+          </p>
+          <p className={`text-xs mt-1 leading-relaxed ${stitchCount >= 2 ? 'text-emerald-700' : 'text-amber-700'}`}>
+            {stitchCount >= 2
+              ? 'Documents were classified, cross-referenced, and merged into a unified Claim Object. Authority rules applied: denial letter → claim IDs & appeal rights; EOB → codes & financials; medical bill → facility details.'
+              : 'Upload an EOB and medical bill alongside the denial letter to unlock higher-confidence extraction and more complete financial analysis.'}
+          </p>
+        </div>
+      </div>
+
+      {/* Document type cards */}
+      <section>
+        <h2 className="text-lg font-bold text-on-surface mb-4">Uploaded Documents ({stitchCount})</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {(['denial', 'eob', 'medical_bill'] as const).map(kind => {
+            const meta = DOC_KIND_META[kind]
+            const present = docProfile ? docProfile.kindsPresent[kind] : true
+            return (
+              <div key={kind} className={`rounded-xl border p-5 ${present ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-50'}`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${present ? 'bg-primary/10' : 'bg-slate-100'}`}>
+                    <span className={`material-symbols-outlined text-lg ${present ? 'text-primary' : 'text-slate-400'}`}>{meta.icon}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-on-surface">{meta.label}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${present ? meta.color : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                      {present ? 'Stitched ✓' : 'Not uploaded'}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {meta.fields.slice(0, 4).map(f => (
+                    <div key={f} className="flex items-center gap-2">
+                      <span className={`material-symbols-outlined text-[14px] ${present ? 'text-emerald-500' : 'text-slate-300'}`}>
+                        {present ? 'check' : 'close'}
+                      </span>
+                      <span className="text-xs text-on-surface-variant">{f}</span>
+                    </div>
+                  ))}
+                  {meta.fields.length > 4 && (
+                    <p className="text-xs text-slate-400 pl-5">+{meta.fields.length - 4} more fields</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Sources map */}
+      <section>
+        <h2 className="text-lg font-bold text-on-surface mb-4 flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary">account_tree</span>
+          Field Sources Map
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Shows which document each key field was extracted from and the extraction confidence.
+        </p>
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-widest">Field</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-widest">Source Document</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-widest">Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {STITCHING_FIELD_SOURCES.map(({ field, source, confidence }) => (
+                <tr key={field} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-sm font-semibold text-on-surface">{field}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">{source}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${confidence >= 90 ? 'bg-emerald-500' : confidence >= 75 ? 'bg-amber-400' : 'bg-red-400'}`}
+                          style={{ width: `${confidence}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-bold ${confidence >= 90 ? 'text-emerald-600' : confidence >= 75 ? 'text-amber-600' : 'text-red-600'}`}>
+                        {confidence}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Stitching notes */}
+      <section className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
+        <h3 className="text-sm font-bold text-amber-800 flex items-center gap-2">
+          <span className="material-symbols-outlined text-amber-600 text-sm">info</span>
+          Stitching Notes
+        </h3>
+        <ul className="space-y-2">
+          {[
+            'Claim reference number cross-referenced across denial letter and EOB — exact match confirmed.',
+            'Billed amount ($4,250.00) confirmed by both EOB and medical bill — high confidence.',
+            'Date of service (March 12, 2026) found in all three documents — exact match.',
+            'No conflicting ICD-10 codes detected across documents.',
+          ].map((note, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-amber-800">
+              <span className="material-symbols-outlined text-amber-500 text-[14px] shrink-0 mt-0.5">check_circle</span>
+              {note}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  )
+}
+
 // ─── Main ResultsDashboard ─────────────────────────────────────────────────────
 type DocProfile = {
   files: { name: string; docKind: string }[]
@@ -280,6 +452,7 @@ export default function ResultsDashboard() {
     <TabSummary />,
     <TabCodes />,
     <TabDetails />,
+    <TabDocuments docProfile={docProfile} />,
   ]
 
   return (

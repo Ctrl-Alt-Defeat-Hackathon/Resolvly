@@ -24,7 +24,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
               <button
-                onClick={() => navigate('/upload-wizard')}
+                onClick={() => navigate('/analyze')}
                 className="px-8 py-4 bg-gradient-to-br from-primary to-primary-container text-on-primary font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
               >
                 Start Free Analysis

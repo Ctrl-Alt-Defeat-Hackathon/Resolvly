@@ -159,7 +159,7 @@ export default function AnalyzeFlow() {
 
   useEffect(() => {
     if (sessionStorage.getItem(RESOLVLY_ANALYSIS_COMPLETE_KEY) === '1') {
-      navigate('/results', { replace: true })
+      navigate('/action-plan', { replace: true })
     }
   }, [navigate])
 
@@ -241,7 +241,7 @@ export default function AnalyzeFlow() {
               onNext={() => {
                 sessionStorage.setItem(RESOLVLY_ANALYSIS_COMPLETE_KEY, '1')
                 persistDocProfileForResults()
-                navigate('/results')
+                navigate('/action-plan')
               }}
             />
           ) : (
