@@ -40,20 +40,20 @@ export default function LandingPage() {
           </div>
 
           <div className="relative group">
-            <div className="absolute -inset-4 bg-primary-container/5 rounded-[2rem] blur-2xl group-hover:bg-primary-container/10 transition-all duration-500"></div>
-            <div className="relative aspect-[4/5] bg-surface-container-low rounded-2xl overflow-hidden shadow-2xl border border-white/20">
+            <div className="absolute -inset-4 rounded-[2rem] bg-primary-container/5 blur-2xl transition-all duration-500 group-hover:bg-primary-container/10 dark:bg-primary/10 dark:group-hover:bg-primary/15"></div>
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/20 bg-surface-container-low shadow-2xl dark:border-slate-600/50 dark:bg-surface-container-high">
               <img
                 alt="Indiana Legal Document"
-                className="w-full h-full object-cover grayscale mix-blend-multiply opacity-80"
+                className="h-full w-full object-cover opacity-80 grayscale mix-blend-multiply dark:mix-blend-normal dark:opacity-100 dark:brightness-[1.08] dark:contrast-[1.05] dark:grayscale-[0.15] dark:saturate-[0.92]"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuBOeuREEIsG_VJ8MueUkq0Qvqlr-K1U4FNIv5iQkV0n9FAHAmnEB9RKSUa4Cs0jTJT61qSeDL5sVGpLYVqPFgW-gLVHqecUSQuIrO1qNVrq5iXlK6tBk3sbKpkVBlAAdHjIneucNRSVLNTZsXSxZlfq0MCdGBGP4ohfvON2wamS-KjlnOZnYuyKrJccJzljUO0e7y8Ikby-yl3TAEzjDsGmvPKufDoBtTQVj8-7Oc6YfM2jXC5Ean-J6Tl7-UisNt2Mq7NqJr12kyQ"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent"></div>
-              <div className="absolute bottom-6 left-6 right-6 p-6 bg-white/80 backdrop-blur-md rounded-xl border border-white/40">
-                <div className="flex items-center gap-3 mb-2">
+              <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent dark:from-primary/55 dark:via-primary/10"></div>
+              <div className="absolute bottom-6 left-6 right-6 rounded-xl border border-white/40 bg-white/85 p-6 backdrop-blur-md dark:border-slate-500/40 dark:bg-slate-900/90 dark:backdrop-blur-md">
+                <div className="mb-2 flex items-center gap-3">
                   <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                  <span className="text-xs font-bold text-primary uppercase tracking-wider">Indiana Accredited</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary">Indiana Accredited</span>
                 </div>
-                <p className="text-sm font-medium text-on-surface italic">
+                <p className="text-sm font-medium italic text-on-surface dark:text-on-surface-variant">
                   "Resolvly translated a 14-page clinical denial into a 3-step action plan in minutes."
                 </p>
               </div>

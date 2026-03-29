@@ -92,10 +92,10 @@ export default function UploadWizard() {
             <section className="lg:col-span-7 space-y-6">
 
               {/* Document Slots */}
-              <div className="bg-surface-container-lowest p-1 rounded-2xl shadow-sm border border-outline-variant/10">
-                <div className="border-2 border-dashed border-outline-variant rounded-xl p-8 space-y-4 bg-surface/50">
+              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-1 shadow-sm dark:border-slate-600/30">
+                <div className="space-y-4 rounded-xl border-2 border-dashed border-outline-variant bg-surface/50 p-8 dark:border-slate-600/50 dark:bg-surface-container/90">
                   <div className="text-center mb-6">
-                    <div className="w-14 h-14 rounded-full bg-secondary-container flex items-center justify-center text-primary mx-auto mb-3">
+                    <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-secondary-container text-primary dark:bg-primary/20">
                       <span className="material-symbols-outlined text-3xl">upload_file</span>
                     </div>
                     <h3 className="text-xl font-bold font-headline text-on-surface">Upload your documents</h3>
@@ -107,35 +107,48 @@ export default function UploadWizard() {
                     {DOC_SLOTS.map(slot => {
                       const uploaded = uploads[slot.type]
                       return (
-                        <div key={slot.type}
-                          className={`flex items-center gap-4 p-4 rounded-xl border transition-all
+                        <div
+                          key={slot.type}
+                          className={`flex items-center gap-4 rounded-xl border p-4 transition-all
                             ${uploaded
-                              ? 'bg-emerald-50 border-emerald-300'
-                              : 'bg-white border-outline-variant/20 hover:border-primary/30'}`}>
+                              ? 'border-emerald-400/80 bg-emerald-50 dark:border-emerald-600/70 dark:bg-emerald-950/45'
+                              : 'border-outline-variant/25 bg-surface-container-lowest hover:border-primary/35 dark:border-slate-600/50 dark:bg-surface-container-high dark:hover:border-primary/45'}`}
+                        >
                           {/* Icon */}
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0
-                            ${uploaded ? 'bg-emerald-100' : 'bg-surface-container'}`}>
-                            <span className={`material-symbols-outlined text-xl
-                              ${uploaded ? 'text-emerald-600' : 'text-on-surface-variant'}`}>
+                          <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg
+                            ${uploaded ? 'bg-emerald-100 dark:bg-emerald-900/60' : 'bg-surface-container dark:bg-surface-container-highest'}`}
+                          >
+                            <span
+                              className={`material-symbols-outlined text-xl
+                              ${uploaded ? 'text-emerald-600 dark:text-emerald-400' : 'text-on-surface-variant'}`}
+                            >
                               {uploaded ? 'check_circle' : slot.icon}
                             </span>
                           </div>
 
                           {/* Label + file name */}
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-bold ${uploaded ? 'text-emerald-800' : 'text-on-surface'}`}>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`text-sm font-bold ${uploaded ? 'text-emerald-900 dark:text-emerald-200' : 'text-on-surface'}`}
+                            >
                               {slot.label}
                             </p>
-                            {uploaded
-                              ? <p className="text-xs text-emerald-600 truncate">{uploaded.name} · {uploaded.size}</p>
-                              : <p className="text-xs text-on-surface-variant">{slot.desc}</p>}
+                            {uploaded ? (
+                              <p className="truncate text-xs text-emerald-700 dark:text-emerald-300/90">
+                                {uploaded.name} · {uploaded.size}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-on-surface-variant">{slot.desc}</p>
+                            )}
                           </div>
 
                           {/* Upload / Remove button */}
                           {uploaded ? (
                             <button
                               onClick={() => removeFile(slot.type)}
-                              className="shrink-0 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors flex items-center gap-1">
+                              className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800 transition-colors hover:bg-red-100 hover:text-red-600 dark:bg-emerald-900/50 dark:text-emerald-200 dark:hover:bg-red-950/60 dark:hover:text-red-300"
+                            >
                               <span className="material-symbols-outlined text-sm">close</span>
                               Remove
                             </button>
@@ -150,7 +163,8 @@ export default function UploadWizard() {
                               />
                               <button
                                 onClick={() => triggerUpload(slot.type)}
-                                className="shrink-0 px-4 py-1.5 text-xs font-bold text-primary bg-surface-container-high hover:bg-primary hover:text-white rounded-lg transition-colors flex items-center gap-1">
+                                className="flex shrink-0 items-center gap-1 rounded-lg bg-surface-container-high px-4 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-on-primary dark:bg-slate-700/80 dark:hover:bg-primary dark:hover:text-on-primary"
+                              >
                                 <span className="material-symbols-outlined text-sm">upload</span>
                                 Select
                               </button>
@@ -165,7 +179,7 @@ export default function UploadWizard() {
 
               {/* Stitching Progress (shown once any file is uploaded) */}
               {Object.keys(uploads).length > 0 && (
-                <div className="bg-surface-container-low p-6 rounded-xl space-y-4">
+                <div className="space-y-4 rounded-xl bg-surface-container-low p-6 dark:bg-surface-container/80">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-bold tracking-widest text-primary uppercase">Stitching Progress</h4>
                     <span className="text-xs font-bold text-on-surface-variant">
@@ -174,7 +188,10 @@ export default function UploadWizard() {
                   </div>
                   <div className="space-y-3">
                     {DOC_SLOTS.filter(s => uploads[s.type]).map(slot => (
-                      <div key={slot.type} className="flex items-center gap-4 p-3 bg-white rounded-lg border border-outline-variant/20">
+                      <div
+                        key={slot.type}
+                        className="flex items-center gap-4 rounded-lg border border-outline-variant/25 bg-surface-container-lowest p-3 dark:border-slate-600/40 dark:bg-surface-container-high"
+                      >
                         <span className="material-symbols-outlined text-secondary">description</span>
                         <div className="flex-grow">
                           <div className="text-xs font-bold text-on-surface">{uploads[slot.type]!.name}</div>
@@ -194,17 +211,17 @@ export default function UploadWizard() {
                 <button
                   onClick={() => canAnalyze && navigate('/action-plan')}
                   disabled={!canAnalyze}
-                  className={`w-full md:w-auto px-10 py-4 rounded-xl font-bold font-headline text-lg shadow-lg flex items-center justify-center gap-3 transition-all
+                  className={`flex w-full items-center justify-center gap-3 rounded-xl px-10 py-4 font-headline text-lg font-bold shadow-lg transition-all md:w-auto
                     ${canAnalyze
-                      ? 'signature-cta text-white hover:shadow-xl hover:scale-[1.02] cursor-pointer'
-                      : 'bg-primary/30 text-white/60 cursor-not-allowed'}`}
+                      ? 'signature-cta cursor-pointer text-white hover:scale-[1.02] hover:shadow-xl'
+                      : 'cursor-not-allowed bg-primary/25 text-white/55 dark:bg-primary/20 dark:text-white/40'}`}
                 >
                   Begin Forensic Analysis
                   <span className="material-symbols-outlined">analytics</span>
                 </button>
                 <p className="text-xs text-on-surface-variant leading-tight">
                   {canAnalyze
-                    ? <span className="text-emerald-600 font-semibold">✓ Ready — all documents uploaded and plan selected.</span>
+                    ? <span className="font-semibold text-emerald-700 dark:text-emerald-400">✓ Ready — all documents uploaded and plan selected.</span>
                     : <>Upload all 3 documents and select a plan type to proceed.</>}
                 </p>
               </div>
@@ -212,7 +229,7 @@ export default function UploadWizard() {
 
             {/* RIGHT: Policy Intelligence */}
             <section className="lg:col-span-5 space-y-6">
-              <div className="bg-surface-container-low p-8 rounded-xl space-y-8">
+              <div className="space-y-8 rounded-xl bg-surface-container-low p-8 dark:bg-surface-container/70">
                 <div className="space-y-2">
                   <h2 className="text-xl font-bold font-headline text-primary">Policy Intelligence</h2>
                   <p className="text-sm text-on-surface-variant">Provide the foundational details of your coverage.</p>
@@ -230,9 +247,11 @@ export default function UploadWizard() {
                       { value: 'individual', label: 'Individual', desc: 'Marketplace or private purchase.' },
                       { value: 'medicaid', label: 'Medicaid', desc: 'State-sponsored healthcare assistance.' },
                     ].map(({ value, label, desc }) => (
-                      <label key={value}
-                        className={`flex items-center gap-4 p-4 bg-surface-container-lowest rounded-lg cursor-pointer transition-all border
-                          ${planType === value ? 'border-primary/40 bg-blue-50/50' : 'border-transparent hover:border-primary/20'}`}>
+                      <label
+                        key={value}
+                        className={`flex cursor-pointer items-center gap-4 rounded-lg border bg-surface-container-lowest p-4 transition-all dark:bg-surface-container-lowest/80
+                          ${planType === value ? 'border-primary/50 bg-blue-50/60 dark:border-primary/45 dark:bg-primary/12' : 'border-transparent hover:border-primary/25 dark:hover:border-primary/35'}`}
+                      >
                         <input
                           className="text-primary focus:ring-primary h-5 w-5 border-outline"
                           name="plan_type"
@@ -261,9 +280,11 @@ export default function UploadWizard() {
                       { value: 'erisa', label: 'Self-funded ERISA', desc: 'Governed by federal labor laws.' },
                       { value: 'insured', label: 'Fully Insured', desc: 'Subject to Indiana IDOI regulations.' },
                     ].map(({ value, label, desc }) => (
-                      <label key={value}
-                        className={`flex items-center gap-4 p-4 bg-surface-container-lowest rounded-lg cursor-pointer transition-all border
-                          ${funding === value ? 'border-primary/40 bg-blue-50/50' : 'border-transparent hover:border-primary/20'}`}>
+                      <label
+                        key={value}
+                        className={`flex cursor-pointer items-center gap-4 rounded-lg border bg-surface-container-lowest p-4 transition-all dark:bg-surface-container-lowest/80
+                          ${funding === value ? 'border-primary/50 bg-blue-50/60 dark:border-primary/45 dark:bg-primary/12' : 'border-transparent hover:border-primary/25 dark:hover:border-primary/35'}`}
+                      >
                         <input
                           className="text-primary focus:ring-primary h-5 w-5 border-outline"
                           name="funding"
@@ -283,9 +304,9 @@ export default function UploadWizard() {
 
                 {/* Status indicator */}
                 {planType && (
-                  <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                    <span className="material-symbols-outlined text-emerald-500 text-sm">check_circle</span>
-                    <span className="text-xs font-semibold text-emerald-700">Plan type selected</span>
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-300/80 bg-emerald-50 p-3 dark:border-emerald-700/60 dark:bg-emerald-950/40">
+                    <span className="material-symbols-outlined text-sm text-emerald-600 dark:text-emerald-400">check_circle</span>
+                    <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">Plan type selected</span>
                   </div>
                 )}
               </div>
@@ -297,7 +318,10 @@ export default function UploadWizard() {
                   { icon: 'security', title: 'Data Sovereignty', desc: 'All data is encrypted and stays within our secure Indiana portal; never used for training public models.' },
                   { icon: 'history_edu', title: 'Drafting Engine', desc: 'The Context Wizard determines the tone and statutory language required for your specific denial type.' },
                 ].map(({ icon, title, desc }) => (
-                  <div key={title} className="p-5 rounded-xl bg-surface-container-lowest space-y-1 border border-outline-variant/10">
+                  <div
+                    key={title}
+                    className="space-y-1 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 dark:border-slate-600/35 dark:bg-surface-container-high/60"
+                  >
                     <div className="flex items-center gap-2">
                       <span className="material-symbols-outlined text-primary text-lg">{icon}</span>
                       <h5 className="font-bold text-on-surface text-sm">{title}</h5>
@@ -314,14 +338,14 @@ export default function UploadWizard() {
       <Footer />
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 h-16 flex items-center justify-around z-50">
+      <div className="fixed bottom-0 z-50 flex h-16 w-full items-center justify-around border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950 md:hidden">
         {[
           { icon: 'home', label: 'Home', active: false, to: '/' },
           { icon: 'upload_file', label: 'Wizard', active: true, to: '/upload-wizard' },
           { icon: 'gavel', label: 'Plan', active: false, to: '/action-plan' },
           { icon: 'account_circle', label: 'Profile', active: false, to: '' },
         ].map(({ icon, label, active }) => (
-          <button key={label} className={`flex flex-col items-center gap-1 ${active ? 'text-primary' : 'text-slate-400'}`}>
+          <button key={label} className={`flex flex-col items-center gap-1 ${active ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`}>
             <span className="material-symbols-outlined text-xl"
               style={active ? { fontVariationSettings: "'FILL' 1" } : {}}>{icon}</span>
             <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>

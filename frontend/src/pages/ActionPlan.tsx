@@ -74,9 +74,9 @@ export default function ActionPlan() {
           <div className="lg:col-span-8 space-y-8">
             {/* Financial Analysis */}
             <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/15 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-headline font-bold text-lg">Bill Breakdown</h3>
+              <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-8 shadow-sm dark:border-slate-600/35">
+                <div className="mb-6 flex items-center justify-between">
+                  <h3 className="font-headline text-lg font-bold text-on-surface">Bill Breakdown</h3>
                   <span className="material-symbols-outlined text-outline">account_balance_wallet</span>
                 </div>
                 <div className="space-y-4">
@@ -96,25 +96,35 @@ export default function ActionPlan() {
                 </div>
               </div>
 
-              <div className="bg-secondary-container p-8 rounded-xl border border-outline-variant/15 relative overflow-hidden">
+              <div className="relative overflow-hidden rounded-xl border border-outline-variant/15 bg-secondary-container p-8 dark:border-slate-600/40 dark:bg-slate-800/90">
                 <div className="relative z-10">
-                  <h3 className="font-headline font-bold text-lg text-on-secondary-fixed-variant mb-4">Regulatory Routing</h3>
+                  <h3 className="mb-4 font-headline text-lg font-bold text-on-secondary-fixed-variant dark:text-slate-200">
+                    Regulatory Routing
+                  </h3>
                   <div className="space-y-4">
-                    <div className="bg-white/50 p-4 rounded-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-sm">gavel</span>
-                        <span className="text-xs font-bold uppercase tracking-widest text-on-secondary-fixed">Entity Determination</span>
+                    <div className="rounded-lg bg-white/50 p-4 ring-1 ring-black/5 dark:!bg-slate-950/90 dark:ring-slate-600/50">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-on-secondary-fixed dark:text-slate-300">gavel</span>
+                        <span className="text-xs font-bold uppercase tracking-widest text-on-secondary-fixed dark:text-slate-300">
+                          Entity Determination
+                        </span>
                       </div>
-                      <div className="text-xl font-extrabold text-on-secondary-fixed mb-1">IDOI (Indiana)</div>
-                      <p className="text-sm text-on-secondary-fixed-variant leading-tight">This plan is fully insured and subject to IDOI IC 27-8-28 oversight.</p>
+                      <div className="mb-1 text-xl font-extrabold text-on-secondary-fixed dark:text-white">IDOI (Indiana)</div>
+                      <p className="text-sm leading-tight text-on-secondary-fixed-variant dark:text-slate-400">
+                        This plan is fully insured and subject to IDOI IC 27-8-28 oversight.
+                      </p>
                     </div>
-                    <div className="opacity-40 grayscale pointer-events-none">
-                      <div className="text-xs font-bold uppercase tracking-widest text-on-secondary-fixed">Alternative: ERISA</div>
-                      <div className="text-lg font-bold">US Dept of Labor</div>
+                    <div className="pointer-events-none opacity-40 grayscale dark:opacity-100 dark:grayscale-0">
+                      <div className="text-xs font-bold uppercase tracking-widest text-on-secondary-fixed dark:text-slate-500">
+                        Alternative: ERISA
+                      </div>
+                      <div className="text-lg font-bold text-on-secondary-fixed dark:text-slate-400">US Dept of Labor</div>
                     </div>
                   </div>
                 </div>
-                <span className="material-symbols-outlined absolute -right-8 -bottom-8 text-9xl text-on-secondary-container/10">policy</span>
+                <span className="material-symbols-outlined absolute -bottom-8 -right-8 text-9xl text-on-secondary-container/10 dark:text-slate-600/40">
+                  policy
+                </span>
               </div>
             </section>
 
@@ -154,8 +164,8 @@ export default function ActionPlan() {
           {/* Right: Deadlines & Actions */}
           <aside className="lg:col-span-4 space-y-8">
             {/* Deadlines */}
-            <div className="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/15 shadow-sm">
-              <h3 className="font-headline font-bold text-xl mb-6">Critical Deadlines</h3>
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-8 shadow-sm dark:border-slate-600/35">
+              <h3 className="mb-6 font-headline text-xl font-bold text-on-surface">Critical Deadlines</h3>
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0 w-12 h-14 bg-error-container rounded-lg flex flex-col items-center justify-center">
@@ -186,37 +196,44 @@ export default function ActionPlan() {
               </div>
             </div>
 
-            {/* Reminders */}
-            <div className="bg-primary p-8 rounded-xl text-on-primary">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="material-symbols-outlined">mail</span>
-                <h3 className="font-headline font-bold text-lg">Reminders</h3>
+            {/* Reminders: light = brand primary; dark = slate only (!) so theme token primary (light blue) never paints the card */}
+            <div className="rounded-xl bg-primary p-8 text-on-primary shadow-lg ring-1 ring-black/10 dark:!bg-slate-950 dark:!text-slate-100 dark:ring-sky-500/25">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="material-symbols-outlined text-on-primary dark:!text-sky-400">mail</span>
+                <h3 className="font-headline text-lg font-bold text-on-primary dark:!text-slate-50">Reminders</h3>
               </div>
-              <p className="text-on-primary-container text-sm mb-6">Stay ahead of deadlines. We will notify you 7 days before any critical window closes.</p>
+              <p className="mb-6 text-sm text-on-primary/90 dark:!text-slate-400">
+                Stay ahead of deadlines. We will notify you 7 days before any critical window closes.
+              </p>
               <div className="space-y-3">
                 {[
                   { key: 'weekly', label: 'Weekly Case Summary' },
                   { key: 'urgent', label: 'Urgent Deadline Alerts' },
                   { key: 'regulatory', label: 'Regulatory Policy Updates' },
                 ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-3 cursor-pointer group">
+                  <label key={key} className="group flex cursor-pointer items-center gap-3">
                     <input
                       checked={reminders[key as keyof typeof reminders]}
                       onChange={() => setReminders(r => ({ ...r, [key]: !r[key as keyof typeof reminders] }))}
-                      className="rounded bg-primary-container border-none focus:ring-0"
+                      className="rounded border border-white/20 bg-primary-container focus:ring-0 dark:border-slate-600 dark:!bg-slate-800 accent-sky-500 dark:accent-sky-400"
                       type="checkbox"
                     />
-                    <span className="text-sm font-medium group-hover:text-primary-container transition-colors">{label}</span>
+                    <span className="text-sm font-medium text-on-primary transition-colors group-hover:text-white dark:!text-slate-200 dark:group-hover:!text-sky-300">
+                      {label}
+                    </span>
                   </label>
                 ))}
               </div>
-              <button className="w-full mt-6 py-3 bg-white text-primary font-bold rounded-lg text-sm shadow-xl hover:bg-surface-container transition-colors">
+              <button
+                type="button"
+                className="mt-6 w-full rounded-lg bg-white py-3 text-sm font-bold text-primary shadow-lg transition-colors hover:bg-slate-50 dark:border dark:!border-slate-600 dark:!bg-slate-800 dark:!text-slate-100 dark:shadow-none dark:hover:!bg-slate-700"
+              >
                 Update Preferences
               </button>
             </div>
 
             {/* Case Manager */}
-            <div className="bg-surface-container-high p-6 rounded-xl border border-outline-variant/15">
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-high p-6 dark:border-slate-600/35">
               <div className="flex items-center gap-4 mb-4">
                 <img
                   alt="Sarah Miller JD"
@@ -231,7 +248,10 @@ export default function ActionPlan() {
               <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
                 "Based on your denial code (CO-197), I recommend prioritizing the medical record collection immediately."
               </p>
-              <button className="w-full py-2 border border-primary text-primary text-xs font-bold rounded uppercase tracking-widest hover:bg-primary hover:text-white transition-all">
+              <button
+                type="button"
+                className="w-full rounded border border-primary py-2 text-xs font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary hover:text-on-primary dark:hover:text-white"
+              >
                 Chat with Sarah
               </button>
             </div>

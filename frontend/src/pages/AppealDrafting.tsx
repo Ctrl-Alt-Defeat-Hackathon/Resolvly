@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import ThemeToggle from '../components/ThemeToggle'
 
 const tabs = ['Appeal Letter (Draft)', 'Message to Provider', 'Message to Insurer']
 
@@ -65,27 +66,39 @@ export default function AppealDrafting() {
               {/* Editor Canvas */}
               <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/10 overflow-hidden">
                 {/* Toolbar */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-surface-container">
+                <div className="flex items-center justify-between border-b border-surface-container px-6 py-4 dark:border-slate-700/60">
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">v1.2 Draft</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline dark:text-slate-400">v1.2 Draft</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button className="p-2 hover:bg-surface-container rounded-lg text-primary transition-colors" title="Copy">
+                    <ThemeToggle />
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-primary transition-colors hover:bg-surface-container dark:hover:bg-slate-800"
+                      title="Copy"
+                    >
                       <span className="material-symbols-outlined">content_copy</span>
                     </button>
-                    <button className="flex items-center gap-2 px-3 py-2 hover:bg-surface-container rounded-lg text-primary transition-colors text-sm font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-surface-container dark:hover:bg-slate-800"
+                    >
                       <span className="material-symbols-outlined text-[20px]">download</span> .txt
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg transition-all hover:opacity-90 text-sm font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-all hover:opacity-90"
+                    >
                       <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span> PDF Export
                     </button>
                   </div>
                 </div>
 
-                {/* Paper */}
-                <div className="p-10 min-h-[600px] text-on-surface leading-loose"
-                  style={{ background: 'linear-gradient(to bottom, transparent 31px, #f3f4f5 32px)', backgroundSize: '100% 32px' }}>
-                  <div className="max-w-prose mx-auto bg-white p-8 shadow-sm">
+                {/* Paper: explicit light/dark surfaces so body text-on-surface (light in dark theme) never sits on white */}
+                <div
+                  className="min-h-[600px] bg-slate-100 p-10 leading-loose [background-image:linear-gradient(to_bottom,transparent_31px,rgb(226_232_240)_32px)] [background-size:100%_32px] dark:bg-slate-950 dark:[background-image:linear-gradient(to_bottom,transparent_31px,rgb(51_65_85)_32px)]"
+                >
+                  <div className="mx-auto max-w-prose bg-white p-8 text-slate-900 shadow-sm dark:border dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                     <p className="mb-6">
                       [DATE]<br />
                       Indiana Department of Insurance<br />
@@ -103,7 +116,7 @@ export default function AppealDrafting() {
                     <p className="mb-4">
                       The denial was based on the assertion that the treatment was "not medically necessary." However, the following Indiana-specific regulatory clinical criteria were not properly applied in this assessment...
                     </p>
-                    <div className="bg-surface-container-low p-4 my-8 border-l-4 border-primary italic text-on-surface-variant">
+                    <div className="my-8 border-l-4 border-primary bg-slate-100 p-4 italic text-slate-700 dark:bg-slate-800/90 dark:text-slate-300">
                       [AI NOTE: Insert specific clinical justification here. The uploaded EOB indicates code 99214 was contested. Resolvly suggests referencing IN-Admin-Code Title 760 for peer-review standards.]
                     </div>
                     <p className="mb-4">
@@ -154,22 +167,25 @@ export default function AppealDrafting() {
                 </div>
               </section>
 
-              {/* Indiana Resources */}
-              <section className="bg-primary text-on-primary p-6 rounded-xl shadow-lg relative overflow-hidden">
+              {/* Indiana Resources — dark: slate card so primary token (light blue) does not clash */}
+              <section className="relative overflow-hidden rounded-xl bg-primary p-6 text-on-primary shadow-lg ring-1 ring-black/10 dark:!bg-slate-900 dark:!text-slate-100 dark:ring-sky-500/25">
                 <div className="relative z-10">
-                  <h3 className="font-headline font-bold text-lg mb-4">Indiana Resources</h3>
-                  <div className="space-y-4 mb-6">
+                  <h3 className="mb-4 font-headline text-lg font-bold">Indiana Resources</h3>
+                  <div className="mb-6 space-y-4">
                     <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-secondary-fixed">account_balance</span>
-                      <span className="text-sm font-semibold">IDOI Consumer Division</span>
+                      <span className="material-symbols-outlined text-secondary-fixed dark:!text-sky-400">account_balance</span>
+                      <span className="text-sm font-semibold dark:!text-slate-100">IDOI Consumer Division</span>
                     </div>
-                    <div className="text-xs space-y-1 opacity-90 leading-relaxed">
+                    <div className="space-y-1 text-xs leading-relaxed opacity-90 dark:!text-slate-400">
                       <p>311 West Washington Street, Suite 300</p>
                       <p>Indianapolis, IN 46204-2787</p>
                       <p className="pt-2">Hotline: 1-800-622-4461</p>
                     </div>
                   </div>
-                  <a href="#" className="inline-flex items-center justify-center w-full bg-on-primary text-primary px-4 py-3 rounded-lg font-bold text-sm hover:bg-secondary-container transition-colors">
+                  <a
+                    href="#"
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-on-primary px-4 py-3 text-sm font-bold text-primary transition-colors hover:bg-secondary-container dark:!border dark:!border-slate-600 dark:!bg-slate-800 dark:!text-slate-100 dark:hover:!bg-slate-700"
+                  >
                     Open IDOI Website
                     <span className="material-symbols-outlined ml-2 text-[18px]">open_in_new</span>
                   </a>

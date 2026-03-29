@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import ThemeToggle from './ThemeToggle'
 
 // Pages shown only on the restricted pre-analysis pages (Landing + Upload)
 const RESTRICTED_NAV = [
@@ -26,9 +27,12 @@ export default function Navbar() {
   const navLinks = isRestricted ? RESTRICTED_NAV : FULL_NAV
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm">
+    <nav className="fixed top-0 z-50 w-full border-b border-slate-200/60 bg-white/90 shadow-sm backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-950/92 dark:shadow-[0_1px_0_0_rgba(15,23,42,0.75)]">
       <div className="flex justify-between items-center px-8 h-16 max-w-full mx-auto">
-        <Link to="/" className="text-2xl font-bold tracking-tighter text-sky-900 font-headline">
+        <Link
+          to="/"
+          className="font-headline text-2xl font-bold tracking-tighter text-sky-900 dark:text-sky-100"
+        >
           Resolvly
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium tracking-wide">
@@ -40,8 +44,8 @@ export default function Navbar() {
                 to={to}
                 className={
                   isActive
-                    ? 'text-sky-900 border-b-2 border-sky-900 pb-1 transition-colors duration-200'
-                    : 'text-slate-500 hover:text-sky-700 transition-colors duration-200'
+                    ? 'border-b-2 border-sky-900 pb-1 text-sky-900 transition-colors duration-200 dark:border-sky-300 dark:text-sky-100'
+                    : 'text-slate-500 transition-colors duration-200 hover:text-sky-700 dark:text-slate-400 dark:hover:text-sky-300'
                 }
               >
                 {label}
@@ -49,16 +53,20 @@ export default function Navbar() {
             )
           })}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
+          <ThemeToggle />
           {isRestricted && pathname !== '/upload-wizard' && (
             <button
               onClick={() => navigate('/upload-wizard')}
-              className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg shadow-sm hover:opacity-90 transition-all"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary shadow-sm transition-all hover:opacity-90"
             >
               Get Started
             </button>
           )}
-          <button className="text-sky-900 font-medium text-sm hover:opacity-80">
+          <button
+            type="button"
+            className="text-sm font-medium text-sky-900 hover:opacity-80 dark:text-sky-100"
+          >
             Sign In
           </button>
         </div>
