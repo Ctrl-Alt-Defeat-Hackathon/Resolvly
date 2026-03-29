@@ -2,7 +2,7 @@
 Output Generation Agent
 
 Takes the ClaimObject + analysis results and generates all user-facing content
-using Gemini 2.5 Flash.
+using Groq (preferred) or Google Gemini.
 
 Outputs:
   - plain_english_summary   → one-paragraph denial explanation for patients
@@ -18,11 +18,9 @@ import json
 import logging
 from typing import Any
 
-from google import genai
-from google.genai import types
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from config import get_settings
+from tools.llm_client import complete_llm
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +30,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class ActionStep(BaseModel):
-    number: int
-    action: str
-    detail: str
-    why: str
-    responsible_party: str
-    expected_timeline: str
+    model_config = ConfigDict(extra="ignore")
+
+    number: int = 1
+    action: str = ""
+    detail: str = ""
+    why: str = ""
+    responsible_party: str = "patient"
+    expected_timeline: str = ""
     contact: dict[str, str] = {}
 
 
@@ -54,9 +54,59 @@ class AppealLetterOutput(BaseModel):
 
 
 class SummaryOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     summary_text: str = ""
     reading_level: str = "8th grade"
     key_points: list[str] = []
+
+
+def _normalize_summary_payload(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Map common LLM JSON variants (camelCase, alternate key names) so summary_text is never
+    dropped when the model deviates from the requested schema.
+    """
+    summary_keys = (
+        "summary_text",
+        "summary",
+        "plain_english_summary",
+        "denial_summary",
+        "explanation",
+        "patient_summary",
+        "text",
+        "content",
+        "summaryText",
+        "plainEnglishSummary",
+    )
+    text = ""
+    for k in summary_keys:
+        v = data.get(k)
+        if v is None:
+            continue
+        if isinstance(v, str) and v.strip():
+            text = v.strip()
+            break
+        if isinstance(v, dict):
+            for nk in ("summary_text", "text", "body", "content"):
+                if v.get(nk) and str(v[nk]).strip():
+                    text = str(v[nk]).strip()
+                    break
+            if text:
+                break
+
+    kp_raw = data.get("key_points") or data.get("keyPoints") or data.get("bullets") or []
+    if isinstance(kp_raw, str) and kp_raw.strip():
+        key_points = [kp_raw.strip()]
+    elif isinstance(kp_raw, list):
+        key_points = [str(x).strip() for x in kp_raw if x is not None and str(x).strip()]
+    else:
+        key_points = []
+
+    rl = data.get("reading_level") or data.get("readingLevel") or "8th grade"
+    if not isinstance(rl, str):
+        rl = "8th grade"
+
+    return {"summary_text": text, "reading_level": rl, "key_points": key_points[:12]}
 
 
 class ProviderBriefOutput(BaseModel):
@@ -66,16 +116,8 @@ class ProviderBriefOutput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Gemini helpers
+# Context + LLM (via tools.llm_client)
 # ---------------------------------------------------------------------------
-
-def _get_client() -> genai.Client | None:
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        logger.warning("Output Agent: GEMINI_API_KEY not set — skipping LLM generation")
-        return None
-    return genai.Client(api_key=settings.gemini_api_key)
-
 
 def _claim_context_summary(claim_dict: dict[str, Any], analysis_dict: dict[str, Any]) -> str:
     """Build a compact context string for LLM prompts."""
@@ -128,39 +170,6 @@ def _claim_context_summary(claim_dict: dict[str, Any], analysis_dict: dict[str, 
     return "\n".join(lines)
 
 
-async def _call_gemini(prompt: str, expect_json: bool = False) -> str:
-    """Call Gemini with a prompt. Returns text response or empty string on failure."""
-    settings = get_settings()
-    client = _get_client()
-    if client is None:
-        return ""
-
-    for model in (settings.gemini_model_primary, settings.gemini_model_fallback):
-        try:
-            config = types.GenerateContentConfig(
-                temperature=0.3,
-                max_output_tokens=4096,
-            )
-            if expect_json:
-                config = types.GenerateContentConfig(
-                    temperature=0.2,
-                    max_output_tokens=4096,
-                    response_mime_type="application/json",
-                )
-            response = await client.aio.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=config,
-            )
-            return response.text or ""
-        except Exception as e:
-            logger.warning(f"Output Agent: Gemini model {model} failed: {e}")
-            continue
-
-    logger.error("Output Agent: all Gemini models failed")
-    return ""
-
-
 # ---------------------------------------------------------------------------
 # Public generation functions
 # ---------------------------------------------------------------------------
@@ -187,16 +196,19 @@ Write a plain-English explanation of this insurance denial for the patient. The 
 5. Be 2-3 short paragraphs maximum
 6. Be empathetic and actionable, not scary
 
-Return a JSON object with exactly these fields:
-{{
-  "summary_text": "<2-3 paragraph plain-English explanation>",
-  "reading_level": "8th grade",
-  "key_points": ["<bullet 1>", "<bullet 2>", "<bullet 3>"]
-}}
+Return a single JSON object with exactly these keys (use snake_case):
+- "summary_text": string, 2-3 short paragraphs plain English
+- "reading_level": string, e.g. "8th grade"
+- "key_points": array of exactly 3 short strings
 
-Key points should be 3 short sentence fragments capturing the most important takeaways.
+Example shape:
+{{
+  "summary_text": "...",
+  "reading_level": "8th grade",
+  "key_points": ["...", "...", "..."]
+}}
 """
-    raw = await _call_gemini(prompt, expect_json=True)
+    raw = await complete_llm(prompt, expect_json=True)
     if not raw:
         return SummaryOutput(
             summary_text="Unable to generate summary — LLM service unavailable.",
@@ -204,10 +216,207 @@ Key points should be 3 short sentence fragments capturing the most important tak
         )
     try:
         data = json.loads(raw)
-        return SummaryOutput(**data)
+        if not isinstance(data, dict):
+            raise ValueError("LLM summary JSON must be an object")
+        norm = _normalize_summary_payload(data)
+        if not norm["summary_text"]:
+            logger.warning("Output Agent: summary JSON parsed but summary_text empty after normalization; using raw fallback")
+            return SummaryOutput(summary_text=raw.strip()[:12000])
+        return SummaryOutput(**norm)
+    except json.JSONDecodeError as e:
+        logger.error(f"Output Agent: invalid summary JSON: {e}")
+        # Show best-effort text so the UI is not blank
+        cleaned = raw.strip()
+        if cleaned:
+            return SummaryOutput(summary_text=cleaned[:12000])
+        return SummaryOutput(
+            summary_text="Could not parse summary from the model. Try again or check server logs.",
+            key_points=[],
+        )
     except Exception as e:
-        logger.error(f"Output Agent: failed to parse summary JSON: {e}")
-        return SummaryOutput(summary_text=raw)
+        logger.error(f"Output Agent: failed to build summary: {e}")
+        return SummaryOutput(summary_text=raw.strip()[:12000] if raw.strip() else "")
+
+
+_VALID_RESPONSIBLE = frozenset({"patient", "provider", "insurer"})
+
+
+def _normalize_action_step_dict(raw: dict[str, Any], index: int) -> dict[str, Any]:
+    """Map camelCase / alternate keys so Groq and other models can deviate from the schema."""
+    n = raw.get("number")
+    if n is None:
+        n = raw.get("step") or raw.get("stepNumber")
+    try:
+        num = int(float(n)) if n is not None else index + 1
+    except (TypeError, ValueError):
+        num = index + 1
+
+    action = (
+        raw.get("action")
+        or raw.get("title")
+        or raw.get("name")
+        or raw.get("step_title")
+        or raw.get("summary")
+    )
+    action_s = str(action).strip() if action is not None else ""
+
+    det = raw.get("detail") or raw.get("description") or raw.get("instructions") or raw.get("body")
+    detail_s = str(det).strip() if det is not None else ""
+
+    why = raw.get("why") or raw.get("rationale") or raw.get("reason") or raw.get("because")
+    why_s = str(why).strip() if why is not None else ""
+
+    rp = str(raw.get("responsible_party") or raw.get("responsibleParty") or raw.get("owner") or "patient").strip().lower()
+    if rp not in _VALID_RESPONSIBLE:
+        rp = "patient"
+
+    et = raw.get("expected_timeline") or raw.get("expectedTimeline") or raw.get("timeline")
+    et_s = str(et).strip() if et is not None else ""
+
+    contact_raw = raw.get("contact")
+    contact: dict[str, str] = {}
+    if isinstance(contact_raw, dict):
+        for k, v in contact_raw.items():
+            if v is None:
+                continue
+            contact[str(k)] = str(v).strip()
+
+    if not action_s:
+        action_s = f"Step {num}"
+    if not detail_s:
+        detail_s = why_s or "Use your denial letter and insurer contact information to complete this step."
+    if not why_s:
+        why_s = "This step keeps your appeal organized and protects your rights."
+
+    return {
+        "number": num,
+        "action": action_s[:500],
+        "detail": detail_s[:2000],
+        "why": why_s[:2000],
+        "responsible_party": rp,
+        "expected_timeline": et_s or "1–5 business days",
+        "contact": contact,
+    }
+
+
+def _action_step_from_loose_item(item: Any, index: int) -> ActionStep | None:
+    if isinstance(item, str):
+        t = item.strip()
+        if not t:
+            return None
+        return ActionStep(
+            number=index + 1,
+            action=t[:500],
+            detail="Follow your plan documents and insurer instructions for this step.",
+            why="Consistent follow-through improves your chance of a successful appeal.",
+            responsible_party="patient",
+            expected_timeline="1–5 business days",
+            contact={},
+        )
+    if isinstance(item, dict):
+        return ActionStep(**_normalize_action_step_dict(item, index))
+    return None
+
+
+def _action_steps_from_parsed_json(data: Any) -> list[ActionStep]:
+    if isinstance(data, list):
+        items: list[Any] = data
+    elif isinstance(data, dict):
+        items = []
+        for key in ("steps", "action_steps", "checklist", "actions", "actionItems"):
+            v = data.get(key)
+            if isinstance(v, list) and v:
+                items = v
+                break
+    else:
+        return []
+
+    out: list[ActionStep] = []
+    for i, item in enumerate(items):
+        step = _action_step_from_loose_item(item, i)
+        if step:
+            out.append(step)
+    return out
+
+
+def _fallback_action_checklist(claim_dict: dict[str, Any], analysis_dict: dict[str, Any]) -> ActionChecklist:
+    """Deterministic steps when the LLM is unavailable or returns unusable JSON."""
+    ident = claim_dict.get("identification", {}) or {}
+    denial = claim_dict.get("denial_reason", {}) or {}
+    appeal = claim_dict.get("appeal_rights", {}) or {}
+    deadlines = analysis_dict.get("deadlines", {}) or {}
+    root = analysis_dict.get("root_cause", {}) or {}
+    internal = deadlines.get("internal_appeal", {}) or {}
+    ref = str(ident.get("claim_reference_number") or "").strip() or "your claim"
+    narrative = str(denial.get("denial_reason_narrative") or "")[:280]
+    rc_cat = str(root.get("category") or "this denial")
+    phone = str(appeal.get("insurer_appeals_phone") or "").strip()
+    addr = str(appeal.get("insurer_appeals_address") or "").strip()
+    deadline_str = str(internal.get("date") or "the date listed on your denial letter")
+    days = internal.get("days_remaining")
+
+    contact_insurer: dict[str, str] = {}
+    if phone:
+        contact_insurer["phone"] = phone
+    if addr:
+        contact_insurer["address"] = addr
+
+    d_tail = ""
+    if isinstance(days, (int, float)):
+        d_tail = f" (about {int(days)} days remaining)."
+    else:
+        d_tail = "."
+
+    steps = [
+        ActionStep(
+            number=1,
+            action="Confirm denial details and internal appeal deadline",
+            detail=f"For claim {ref}, verify the denial reason and any codes listed. Your internal appeal deadline is {deadline_str}{d_tail}",
+            why="Missing a deadline can end your right to appeal this decision.",
+            responsible_party="patient",
+            expected_timeline="Same day",
+            contact={},
+        ),
+        ActionStep(
+            number=2,
+            action="Gather supporting records",
+            detail="Collect visit notes, labs, imaging reports, or prior authorization letters that relate to the denied service."
+            + (f" Denial summary: {narrative}" if narrative else ""),
+            why="Insurers often reverse denials when documentation shows medical necessity or billing support.",
+            responsible_party="patient",
+            expected_timeline="2–7 business days",
+            contact={},
+        ),
+        ActionStep(
+            number=3,
+            action="Address the main issue",
+            detail=f"Focus on what the analysis flagged: {rc_cat}. Work with your provider if clinical or billing corrections are needed.",
+            why="Appeals that directly address the insurer's stated reason are more likely to succeed.",
+            responsible_party="patient",
+            expected_timeline="3–10 business days",
+            contact={},
+        ),
+        ActionStep(
+            number=4,
+            action="Submit a formal internal appeal",
+            detail="Send a written appeal to the insurer's appeals address with your reference number, a clear request for reconsideration, and copies of supporting documents."
+            + (f" Insurer phone on file: {phone}." if phone else ""),
+            why="An internal appeal is usually required before external review or other remedies.",
+            responsible_party="patient",
+            expected_timeline="1–3 business days to prepare",
+            contact=contact_insurer,
+        ),
+        ActionStep(
+            number=5,
+            action="Track the decision and next steps",
+            detail="Keep a copy of what you sent and follow up if you do not receive a decision within the timeframe your plan describes.",
+            why="A documented paper trail helps if you need to escalate.",
+            responsible_party="patient",
+            expected_timeline="Ongoing",
+            contact={},
+        ),
+    ]
+    return ActionChecklist(steps=steps, total_steps=len(steps))
 
 
 async def generate_action_checklist(
@@ -216,7 +425,6 @@ async def generate_action_checklist(
 ) -> ActionChecklist:
     """Generate numbered action steps with why-expanders."""
     context = _claim_context_summary(claim_dict, analysis_dict)
-    root_cause = analysis_dict.get("root_cause", {})
     deadlines = analysis_dict.get("deadlines", {})
     state_rules = analysis_dict.get("enrichment", {}).get("state_rules", {}) if analysis_dict.get("enrichment") else {}
     doi_contact = state_rules.get("doi_contact", {}) if state_rules else {}
@@ -234,7 +442,7 @@ Rules:
 - Include contact info where known (from claim data above)
 - Expected timeline should be realistic business-day estimates
 
-Return a JSON object with this exact structure:
+Return a JSON object with this exact structure (use snake_case keys):
 {{
   "steps": [
     {{
@@ -242,7 +450,7 @@ Return a JSON object with this exact structure:
       "action": "<short action title, imperative, max 10 words>",
       "detail": "<specific instructions for this step, 1-2 sentences>",
       "why": "<explanation of why this step matters, 1-2 sentences>",
-      "responsible_party": "patient" | "provider" | "insurer",
+      "responsible_party": "patient",
       "expected_timeline": "<e.g., '1-3 business days'>",
       "contact": {{
         "name": "<contact name if known, else empty>",
@@ -253,19 +461,31 @@ Return a JSON object with this exact structure:
   ]
 }}
 
+Each responsible_party must be exactly one of: "patient", "provider", "insurer".
+
 DOI Contact info: {json.dumps(doi_contact)}
 Internal appeal deadline: {deadlines.get('internal_appeal', {}).get('date', 'Unknown')} ({deadlines.get('internal_appeal', {}).get('days_remaining', '?')} days remaining)
 """
-    raw = await _call_gemini(prompt, expect_json=True)
-    if not raw:
-        return ActionChecklist(steps=[], total_steps=0)
-    try:
-        data = json.loads(raw)
-        steps = [ActionStep(**s) for s in data.get("steps", [])]
-        return ActionChecklist(steps=steps, total_steps=len(steps))
-    except Exception as e:
-        logger.error(f"Output Agent: failed to parse checklist JSON: {e}")
-        return ActionChecklist(steps=[], total_steps=0)
+    raw = await complete_llm(prompt, expect_json=True)
+    parsed_steps: list[ActionStep] = []
+    if raw:
+        try:
+            data = json.loads(raw)
+            parsed_steps = _action_steps_from_parsed_json(data)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Output Agent: checklist JSON invalid: {e}")
+        except Exception as e:
+            logger.warning(f"Output Agent: checklist parse failed: {e}")
+
+    fixed: list[ActionStep] = []
+    for i, s in enumerate(parsed_steps):
+        fixed.append(s.model_copy(update={"number": i + 1}))
+
+    if not fixed:
+        logger.info("Output Agent: using context-based fallback action checklist")
+        return _fallback_action_checklist(claim_dict, analysis_dict)
+
+    return ActionChecklist(steps=fixed, total_steps=len(fixed))
 
 
 async def generate_appeal_letter(
@@ -344,7 +564,7 @@ Return a JSON object with exactly:
   ]
 }}
 """
-    raw = await _call_gemini(prompt, expect_json=True)
+    raw = await complete_llm(prompt, expect_json=True)
     if not raw:
         fallback_letter = _fallback_appeal_letter(patient_name, patient_address, ident, laws_text, appeal_address, internal_deadline, root_cause)
         return AppealLetterOutput(
@@ -420,7 +640,7 @@ Make the brief concise, professional, and immediately actionable. Return a JSON 
   "pdf_ready": true
 }}
 """
-    raw = await _call_gemini(prompt, expect_json=True)
+    raw = await complete_llm(prompt, expect_json=True)
     if not raw:
         return ProviderBriefOutput(
             brief_text="## Provider Brief\n\nUnable to generate provider brief — LLM service unavailable.\n\nPlease review the claim details and contact the patient.",
@@ -830,7 +1050,7 @@ async def _generate_routing_card_markdown(
     state: str,
     regulation_type: str,
 ) -> str:
-    """Generate a clean patient-readable markdown routing card using Gemini."""
+    """Generate a clean patient-readable markdown routing card using the configured LLM."""
     route_label = {
         "erisa_federal": "Federal ERISA (DOL)",
         "state_doi": f"{state} Department of Insurance",
@@ -913,7 +1133,7 @@ Generate a routing card in this exact Markdown structure (fill in the details):
 
 Keep it concise, clear, and actionable. Use plain English — no jargon.
 """
-    raw = await _call_gemini(prompt, expect_json=False)
+    raw = await complete_llm(prompt, expect_json=False)
     if not raw:
         # Return a deterministic fallback card
         lines = [
@@ -1215,7 +1435,7 @@ def generate_probability_details(
 
 
 # ---------------------------------------------------------------------------
-# Fallback content (used when Gemini is unavailable)
+# Fallback content (used when LLM is unavailable)
 # ---------------------------------------------------------------------------
 
 def _fallback_appeal_letter(

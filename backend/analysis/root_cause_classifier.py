@@ -19,11 +19,10 @@ import json
 import logging
 from typing import Any
 
-from google import genai
-from google.genai import types
 from pydantic import BaseModel
 
 from config import get_settings
+from tools.llm_client import complete_llm
 from extraction.schema import ClaimObject, RootCauseCategory
 
 logger = logging.getLogger(__name__)
@@ -173,21 +172,19 @@ def _classify_by_carc(carc_codes: list[str]) -> RootCauseResult | None:
 
 async def _classify_by_llm(claim: ClaimObject) -> RootCauseResult:
     """
-    Use Gemini to classify root cause when CARC rules are insufficient.
+    Use LLM (Groq or Gemini) to classify root cause when CARC rules are insufficient.
     """
     settings = get_settings()
 
-    if not settings.gemini_api_key:
-        logger.warning("GEMINI_API_KEY not set — returning unknown root cause")
+    if not settings.groq_api_key and not settings.gemini_api_key:
+        logger.warning("GROQ_API_KEY or GEMINI_API_KEY not set — returning unknown root cause")
         return RootCauseResult(
             category=RootCauseCategory.procedural_administrative,
             confidence=0.3,
             responsible_party="unknown",
-            reasoning="Could not classify — Gemini API key not configured",
+            reasoning="Could not classify — no LLM API key configured",
             classification_method="fallback",
         )
-
-    client = genai.Client(api_key=settings.gemini_api_key)
 
     prompt = f"""You are an expert in medical billing and insurance claim denials.
 
@@ -219,16 +216,10 @@ Return JSON with these fields:
 }}"""
 
     try:
-        response = await client.aio.models.generate_content(
-            model=settings.gemini_model_primary,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.1,
-            ),
-        )
-
-        data = json.loads(response.text)
+        text = await complete_llm(prompt, expect_json=True)
+        if not text:
+            raise ValueError("empty LLM response")
+        data = json.loads(text)
         category_str = data.get("category", "procedural_administrative")
 
         try:

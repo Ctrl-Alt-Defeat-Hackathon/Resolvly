@@ -11,6 +11,7 @@ based on the user's answers to 3 questions, and returns:
 """
 
 import json
+import logging
 from enum import Enum
 from pathlib import Path
 
@@ -19,8 +20,11 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from tools.regulatory_fetch import fetch_applicable_laws_for_profile
+
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
 
 _DOI_DATA_PATH = Path(__file__).parent.parent.parent / "data" / "state_doi_contacts.json"
 
@@ -88,61 +92,19 @@ def _get_state_doi(state: str) -> StateSpecific | None:
 
 
 # ---------------------------------------------------------------------------
-# Routing logic
+# Routing logic — applicable_laws[] populated at request time from live eCFR API
 # ---------------------------------------------------------------------------
 
-_ERISA_LAWS = [
-    {
-        "law": "ERISA",
-        "section": "§503 (29 U.S.C. §1133)",
-        "relevance": "Requires internal appeal procedures for self-funded employer plans",
-        "url": "https://www.dol.gov/general/topic/health-plans/erisa",
-    },
-    {
-        "law": "29 CFR §2560.503-1",
-        "section": "Claims Procedure Regulation",
-        "relevance": "Specifies timelines, notices, and appeal rights for ERISA plans",
-        "url": "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XXV/subchapter-G/part-2560/section-2560.503-1",
-    },
-    {
-        "law": "ACA §2719",
-        "section": "45 CFR §147.136",
-        "relevance": "Internal/external appeal rules (applies to non-grandfathered plans)",
-        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-147/section-147.136",
-    },
-]
 
-_ACA_STATE_LAWS = [
-    {
-        "law": "ACA §2719",
-        "section": "45 CFR §147.136",
-        "relevance": "Requires internal and external appeal rights for fully-insured plans",
-        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-147/section-147.136",
-    },
-    {
-        "law": "PPACA §1001",
-        "section": "Public Health Service Act §2719",
-        "relevance": "Mandates external independent review for adverse benefit determinations",
-        "url": "https://www.hhs.gov/healthcare/rights/appeal/index.html",
-    },
-]
-
-_MEDICAID_LAWS = [
-    {
-        "law": "42 CFR §431.200–§431.250",
-        "section": "Medicaid Fair Hearing Requirements",
-        "relevance": "Federal regulations governing Medicaid beneficiary appeal rights",
-        "url": "https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-C/part-431/subpart-E",
-    },
-    {
-        "law": "42 U.S.C. §1396a(a)(3)",
-        "section": "Social Security Act",
-        "relevance": "State Medicaid plans must provide opportunity for a fair hearing",
-        "url": "https://www.ssa.gov/OP_Home/ssact/title19/1902.htm",
-    },
-]
-
-_INDIVIDUAL_LAWS = _ACA_STATE_LAWS  # Individual market plans are state-regulated, ACA applies
+async def _merge_dynamic_laws(resp: WizardResponse, profile: str) -> WizardResponse:
+    """profile: erisa | state_aca | medicaid"""
+    try:
+        laws = await fetch_applicable_laws_for_profile(profile)
+        if laws:
+            resp.applicable_laws = laws
+    except Exception as e:
+        logger.warning("Live regulatory fetch failed (%s): %s", profile, e)
+    return resp
 
 
 def _build_erisa_response(state: str) -> WizardResponse:
@@ -160,7 +122,7 @@ def _build_erisa_response(state: str) -> WizardResponse:
             url="https://www.dol.gov/agencies/ebsa",
             phone="1-866-444-3272",
         ),
-        applicable_laws=_ERISA_LAWS,
+        applicable_laws=[],
         state_specific=_get_state_doi(state),
     )
 
@@ -185,7 +147,7 @@ def _build_state_response(state: str) -> WizardResponse:
             url=regulator_url,
             phone=regulator_phone,
         ),
-        applicable_laws=_ACA_STATE_LAWS,
+        applicable_laws=[],
         state_specific=state_doi,
     )
 
@@ -206,7 +168,7 @@ def _build_medicaid_response(state: str) -> WizardResponse:
             url="https://www.medicaid.gov",
             phone="1-800-633-4227",
         ),
-        applicable_laws=_MEDICAID_LAWS,
+        applicable_laws=[],
         state_specific=state_doi,
     )
 
@@ -231,7 +193,7 @@ def _build_individual_response(state: str) -> WizardResponse:
             url=regulator_url,
             phone=regulator_phone,
         ),
-        applicable_laws=_INDIVIDUAL_LAWS,
+        applicable_laws=[],
         state_specific=state_doi,
     )
 
@@ -244,29 +206,31 @@ async def plan_type_wizard(request: Request, body: WizardRequest) -> WizardRespo
     if body.source == PlanSource.employer:
         emp_type = body.employer_plan_type or EmployerPlanType.unknown
         if emp_type == EmployerPlanType.erisa:
-            return _build_erisa_response(state)
+            return await _merge_dynamic_laws(_build_erisa_response(state), "erisa")
         elif emp_type == EmployerPlanType.fully_insured:
-            return _build_state_response(state)
+            return await _merge_dynamic_laws(_build_state_response(state), "state_aca")
         else:
-            # Unknown employer plan: default to ERISA (most common for large employers)
             resp = _build_erisa_response(state)
-            resp.applicable_laws = _ERISA_LAWS + [
+            resp = await _merge_dynamic_laws(resp, "erisa")
+            resp.applicable_laws = list(resp.applicable_laws) + [
                 {
-                    "law": "Note",
-                    "section": "Plan type uncertain",
-                    "relevance": "Large employers (>250 employees) are usually ERISA self-funded. Small employers are often fully-insured (state-regulated). Check your Summary Plan Description (SPD).",
-                    "url": "https://www.dol.gov/agencies/ebsa/about-ebsa/our-activities/resource-center/faqs/aca-implementation-part-i",
+                    "law": "Plan type uncertain",
+                    "section": "Verify SPD / plan documents",
+                    "relevance": "Employer plan type affects whether ERISA or state DOI rules apply. "
+                    "Confirm with your plan administrator.",
+                    "url": "https://www.dol.gov/agencies/ebsa",
+                    "source": "U.S. Department of Labor (EBSA)",
                 }
             ]
             return resp
 
     elif body.source == PlanSource.marketplace:
-        return _build_state_response(state)
+        return await _merge_dynamic_laws(_build_state_response(state), "state_aca")
 
     elif body.source == PlanSource.medicaid:
-        return _build_medicaid_response(state)
+        return await _merge_dynamic_laws(_build_medicaid_response(state), "medicaid")
 
     elif body.source == PlanSource.individual:
-        return _build_individual_response(state)
+        return await _merge_dynamic_laws(_build_individual_response(state), "state_aca")
 
     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unknown plan source.")

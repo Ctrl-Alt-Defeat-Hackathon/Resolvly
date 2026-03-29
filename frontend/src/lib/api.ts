@@ -71,6 +71,60 @@ export async function wizardPlanType(body: {
   return handleJson<Record<string, unknown>>(res)
 }
 
+export async function getCodeLookup(code: string, type: 'icd10' | 'cpt' | 'hcpcs' | 'carc' | 'rarc' | 'npi') {
+  const params = new URLSearchParams({ code: code.trim(), type })
+  const res = await fetch(`${API}/codes/lookup?${params}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  })
+  return handleJson<{
+    code: string
+    code_type: string
+    description: string
+    plain_english: string
+    common_fix: string
+    source: string
+    source_url: string
+    found: boolean
+  }>(res)
+}
+
+export async function postSummary(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>
+) {
+  const res = await fetch(`${API}/outputs/summary`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ claim_object, analysis, enrichment }),
+  })
+  return handleJson<{
+    summary_text: string
+    reading_level: string
+    key_points: string[]
+  }>(res)
+}
+
+export async function postProbability(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>
+) {
+  const res = await fetch(`${API}/outputs/probability`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ claim_object, analysis, enrichment }),
+  })
+  return handleJson<{
+    score: number
+    percentage: string
+    interpretation: string
+    reasoning: string
+    top_recommendation: string
+  }>(res)
+}
+
 export async function postActionChecklist(
   claim_object: Record<string, unknown>,
   analysis: Record<string, unknown>,
@@ -101,6 +155,19 @@ export async function postAppealLetter(
     insurer_message?: string
     legal_citations?: unknown[]
   }>(res)
+}
+
+export async function postProviderBrief(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>
+) {
+  const res = await fetch(`${API}/outputs/provider-brief`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ claim_object, analysis, enrichment }),
+  })
+  return handleJson<{ brief_text: string; format?: string; pdf_ready?: boolean }>(res)
 }
 
 export async function postDeadlines(claim_object: Record<string, unknown>, analysis: Record<string, unknown>) {
@@ -137,4 +204,77 @@ export async function postExportPdf(body: { content: string; format: string; tit
   })
   if (!res.ok) throw new Error(await res.text())
   return res.blob()
+}
+
+/** POST /outputs/assumptions — structured panel from analysis.assumptions */
+export async function postAssumptionsPanel(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>
+) {
+  const res = await fetch(`${API}/outputs/assumptions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ claim_object, analysis, enrichment }),
+  })
+  return handleJson<{
+    assumptions: Array<{
+      assumption: string
+      confidence: number
+      confidence_percentage: string
+      impact: string
+      how_to_verify: string
+      if_incorrect: string
+    }>
+    high_impact_count: number
+    medium_impact_count: number
+    overall_confidence: number
+    overall_confidence_percentage: string
+    reliability_note: string
+  }>(res)
+}
+
+/** POST /outputs/routing-card — ERISA vs state DOI routing */
+export async function postRoutingCard(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>
+) {
+  const res = await fetch(`${API}/outputs/routing-card`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ claim_object, analysis, enrichment }),
+  })
+  return handleJson<Record<string, unknown>>(res)
+}
+
+/** POST /outputs/completeness — denial letter completeness checklist */
+export async function postCompletenessReport(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>
+) {
+  const res = await fetch(`${API}/outputs/completeness`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ claim_object, analysis, enrichment }),
+  })
+  return handleJson<{
+    score: number
+    score_percentage: string
+    regulation_standard: string
+    deficient: boolean
+    escalation_available: boolean
+    escalation_reason: string
+    checklist: Array<{
+      field: string
+      present: boolean
+      required_by: string
+      why_it_matters: string
+      action_if_missing: string
+    }>
+    present_count: number
+    missing_count: number
+    summary: string
+  }>(res)
 }

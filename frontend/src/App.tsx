@@ -4,7 +4,6 @@ import UploadWizard from './pages/UploadWizard'
 import AnalyzeFlow from './pages/AnalyzeFlow'
 import ActionPlan from './pages/ActionPlan'
 import BillBreakdown from './pages/BillBreakdown'
-import CodeLookup from './pages/CodeLookup'
 import AppealDrafting from './pages/AppealDrafting'
 import IndianaResourcesLayout from './pages/IndianaResourcesLayout'
 import IndianaResourcesHub from './pages/IndianaResourcesHub'
@@ -19,11 +18,12 @@ function App() {
         <Route path="/analyze" element={<AnalyzeFlow />} />
         <Route path="/action-plan" element={<ActionPlan />} />
         <Route path="/bill-breakdown" element={<BillBreakdown />} />
-        <Route path="/code-lookup" element={<CodeLookup />} />
         <Route path="/appeal-drafting" element={<AppealDrafting />} />
         <Route path="/indiana-resources" element={<IndianaResourcesLayout />}>
           <Route index element={<IndianaResourcesHub />} />
-          <Route path="code-lookup" element={<CodeLookupContent />} />
+        </Route>
+        <Route path="/code-lookup" element={<IndianaResourcesLayout />}>
+          <Route index element={<CodeLookupContent />} />
         </Route>
       </Routes>
     </BrowserRouter>

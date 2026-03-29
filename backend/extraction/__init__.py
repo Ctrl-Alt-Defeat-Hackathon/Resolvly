@@ -2,7 +2,7 @@
 Entity extraction pipeline — two-pass hybrid extraction.
 
 Pass 1: Deterministic regex extraction (regex_extractor)
-Pass 2: LLM-powered extraction via Gemini (llm_extractor)
+Pass 2: LLM-powered extraction via Groq/Gemini (llm_extractor)
 Multi-doc: Document stitcher for merging multiple document extractions
 """
 from extraction.regex_extractor import extract_pass1
