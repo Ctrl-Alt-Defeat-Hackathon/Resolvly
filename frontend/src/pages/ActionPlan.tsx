@@ -6,11 +6,13 @@ import { analysisBundleFingerprint, loadAnalysisBundle } from '../lib/sessionKey
 import { postExportIcs } from '../lib/api'
 import {
   getCachedActionChecklist,
+  getCachedAppealLetter,
   getCachedCompleteness,
   getCachedDeadlines,
   getCachedProviderBrief,
   getCachedRoutingCard,
   getCachedSummary,
+  getCachedAssumptions,
 } from '../lib/outputsCache'
 
 type StepRow = {
@@ -49,6 +51,19 @@ function severityLabel(t: string | undefined) {
   if (t === 'urgent') return 'Urgent'
   if (t === 'routine') return 'Routine'
   return 'Time-Sensitive'
+}
+
+function buildPatientInfo(claim: Record<string, unknown>): Record<string, string> {
+  const pp = (claim.patient_provider ?? {}) as Record<string, unknown>
+  const ar = (claim.appeal_rights ?? {}) as Record<string, unknown>
+  const out: Record<string, string> = {}
+  const name = typeof pp.patient_full_name === 'string' ? pp.patient_full_name.trim() : ''
+  if (name) out.name = name
+  const addr = typeof pp.facility_address === 'string' ? pp.facility_address.trim() : ''
+  if (addr) out.address = addr
+  const phone = typeof ar.insurer_appeals_phone === 'string' ? ar.insurer_appeals_phone.trim() : ''
+  if (phone) out.phone = phone
+  return out
 }
 
 function RoutingRouteBlock({
@@ -309,6 +324,14 @@ export default function ActionPlan() {
     getCachedDeadlines(bundle.claim_object, bundle.analysis)
       .then(r => setDeadlineInfo(r.deadlines ?? []))
       .catch(() => setDeadlineInfo([]))
+
+    // Prefetch appeal letter in background so AppealDrafting opens faster.
+    // Do not block this page on the result.
+    const patientInfo = buildPatientInfo(bundle.claim_object)
+    void getCachedAppealLetter(bundle.claim_object, bundle.analysis, bundle.enrichment, patientInfo)
+
+    // Prefetch assumptions panel in background so the sidebar loads instantly.
+    void getCachedAssumptions(bundle.claim_object, bundle.analysis, bundle.enrichment)
   }, [bundle, bundleFingerprint])
 
   async function downloadIcs(which: 'internal' | 'external') {
