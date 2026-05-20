@@ -3,7 +3,7 @@ POST /api/v1/documents/extract
 
 Runs the full two-pass entity extraction pipeline:
   Pass 1: Deterministic regex extraction (free, instant)
-  Pass 2: LLM-powered extraction via Groq/Gemini (contextual entities)
+  Pass 2: LLM-powered extraction via OpenAI (contextual entities)
 
 Supports multi-document stitching when multiple documents are provided.
 """

@@ -2,7 +2,7 @@
 Output Generation Agent
 
 Takes the ClaimObject + analysis results and generates all user-facing content
-using Groq (preferred) or Google Gemini.
+using OpenAI.
 
 Outputs:
   - plain_english_summary   → one-paragraph denial explanation for patients
@@ -244,7 +244,7 @@ Example shape:
   "key_points": ["...", "...", "..."]
 }}
 """
-    raw = await complete_llm(prompt, expect_json=True, priority=5)  # Normal priority for summaries
+    raw = await complete_llm(prompt, expect_json=True, priority=3)
     if not raw:
         return SummaryOutput(
             summary_text="Unable to generate summary — LLM service unavailable.",
@@ -278,7 +278,7 @@ _VALID_RESPONSIBLE = frozenset({"patient", "provider", "insurer"})
 
 
 def _normalize_action_step_dict(raw: dict[str, Any], index: int) -> dict[str, Any]:
-    """Map camelCase / alternate keys so Groq and other models can deviate from the schema."""
+    """Map camelCase / alternate keys so models can deviate from the schema."""
     n = raw.get("number")
     if n is None:
         n = raw.get("step") or raw.get("stepNumber")
@@ -502,7 +502,7 @@ Each responsible_party must be exactly one of: "patient", "provider", "insurer".
 DOI Contact info: {json.dumps(doi_contact)}
 Internal appeal deadline: {deadlines.get('internal_appeal', {}).get('date', 'Unknown')} ({deadlines.get('internal_appeal', {}).get('days_remaining', '?')} days remaining)
 """
-    raw = await complete_llm(prompt, expect_json=True, priority=4)  # High priority for action checklist
+    raw = await complete_llm(prompt, expect_json=True, priority=3)
     parsed_steps: list[ActionStep] = []
     if raw:
         try:
@@ -601,7 +601,7 @@ Return a JSON object with exactly:
   ]
 }}
 """
-    raw = await complete_llm(prompt, expect_json=True, priority=3)  # High priority for appeal letters
+    raw = await complete_llm(prompt, expect_json=True, priority=8)  # Defer until Action Plan outputs
     if not raw:
         fallback_letter = _fallback_appeal_letter(patient_name, patient_address, ident, laws_text, appeal_address, internal_deadline, root_cause)
         return AppealLetterOutput(
@@ -693,7 +693,7 @@ Make the brief concise, professional, and immediately actionable. Return a JSON 
   "pdf_ready": true
 }}
 """
-    raw = await complete_llm(prompt, expect_json=True, priority=6)  # Lower priority for provider briefs
+    raw = await complete_llm(prompt, expect_json=True, priority=4)
     if not raw:
         return ProviderBriefOutput(
             brief_text="## Provider Brief\n\nUnable to generate provider brief — LLM service unavailable.\n\nPlease review the claim details and contact the patient.",
@@ -1186,7 +1186,7 @@ Generate a routing card in this exact Markdown structure (fill in the details):
 
 Keep it concise, clear, and actionable. Use plain English — no jargon.
 """
-    raw = await complete_llm(prompt, expect_json=False, priority=7)  # Lower priority for routing cards
+    raw = await complete_llm(prompt, expect_json=False, priority=5)
     if not raw:
         # Return a deterministic fallback card
         lines = [

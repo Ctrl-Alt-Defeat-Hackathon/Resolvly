@@ -1,7 +1,7 @@
 """
 Pass 2 — LLM-Powered Entity Extraction.
 
-Uses Groq (preferred) or Google Gemini with structured JSON output to extract entities
+Uses OpenAI with structured JSON output to extract entities
 that require contextual understanding:
   - denial reason narratives
   - provider / patient names (NER)
@@ -90,8 +90,8 @@ async def extract_pass2(
     Returns an empty dict if no LLM API key is configured or the call fails.
     """
     settings = get_settings()
-    if not settings.groq_api_key and not settings.gemini_api_key:
-        logger.warning("GROQ_API_KEY or GEMINI_API_KEY not set — skipping Pass 2 LLM extraction")
+    if not settings.openai_api_key:
+        logger.warning("OPENAI_API_KEY not set — skipping Pass 2 LLM extraction")
         return {}
 
     user_prompt = _build_user_prompt(text, pass1_results)

@@ -172,12 +172,12 @@ def _classify_by_carc(carc_codes: list[str]) -> RootCauseResult | None:
 
 async def _classify_by_llm(claim: ClaimObject) -> RootCauseResult:
     """
-    Use LLM (Groq or Gemini) to classify root cause when CARC rules are insufficient.
+    Use LLM (OpenAI) to classify root cause when CARC rules are insufficient.
     """
     settings = get_settings()
 
-    if not settings.groq_api_key and not settings.gemini_api_key:
-        logger.warning("GROQ_API_KEY or GEMINI_API_KEY not set — returning unknown root cause")
+    if not settings.openai_api_key:
+        logger.warning("OPENAI_API_KEY not set — returning unknown root cause")
         return RootCauseResult(
             category=RootCauseCategory.procedural_administrative,
             confidence=0.3,

@@ -327,3 +327,55 @@ export function clearAllOutputsCache(): void {
   sessionStorage.removeItem(CACHE_VERSION_KEY)
   console.log('[Cache] All outputs cache cleared')
 }
+
+export type ActionPlanPrefetchStep =
+  | 'completeness'
+  | 'deadlines'
+  | 'assumptions'
+  | 'summary'
+  | 'action_checklist'
+  | 'provider_brief'
+  | 'routing_card'
+
+/**
+ * Action Plan outputs: fast rule-based endpoints first, then all LLM outputs in parallel
+ * (backend allows multiple concurrent OpenAI calls via LLM_MAX_CONCURRENT_REQUESTS).
+ */
+export async function prefetchActionPlanOutputs(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>,
+  onStep?: (step: ActionPlanPrefetchStep) => void
+): Promise<void> {
+  onStep?.('completeness')
+  onStep?.('deadlines')
+  onStep?.('assumptions')
+  await Promise.all([
+    getCachedCompleteness(claim_object, analysis, enrichment),
+    getCachedDeadlines(claim_object, analysis),
+    getCachedAssumptions(claim_object, analysis, enrichment),
+  ])
+
+  onStep?.('summary')
+  onStep?.('action_checklist')
+  onStep?.('provider_brief')
+  onStep?.('routing_card')
+  await Promise.all([
+    getCachedSummary(claim_object, analysis, enrichment),
+    getCachedActionChecklist(claim_object, analysis, enrichment),
+    getCachedProviderBrief(claim_object, analysis, enrichment),
+    getCachedRoutingCard(claim_object, analysis, enrichment),
+  ])
+}
+
+/**
+ * Secondary LLM outputs for other pages — call only after Action Plan prefetch finishes.
+ */
+export async function prefetchSecondaryOutputs(
+  claim_object: Record<string, unknown>,
+  analysis: Record<string, unknown>,
+  enrichment: Record<string, unknown>,
+  patient_info: Record<string, string> = {}
+): Promise<void> {
+  await getCachedAppealLetter(claim_object, analysis, enrichment, patient_info)
+}
