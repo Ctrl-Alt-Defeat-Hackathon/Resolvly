@@ -3,16 +3,22 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { clearAllOutputsCache } from '../lib/outputsCache'
 import { clearAnalysisSession, hasActiveAnalysis } from '../lib/sessionKeys'
 
-const RESTRICTED_NAV: Array<{ label: string; to: string }> = []
+type NavItem = { label: string; to: string; icon: string }
 
-const FULL_NAV = [
-  { label: 'Action Plan', to: '/action-plan' },
-  { label: 'Appeal Drafting', to: '/appeal-drafting' },
-  { label: 'Indiana Resources', to: '/indiana-resources' },
-  { label: 'Code Lookup', to: '/code-lookup' },
+const RESTRICTED_NAV: NavItem[] = []
+
+const FULL_NAV: NavItem[] = [
+  { label: 'Action Plan', to: '/action-plan', icon: 'assignment' },
+  { label: 'Appeal Drafting', to: '/appeal-drafting', icon: 'edit_document' },
+  { label: 'Indiana Resources', to: '/indiana-resources', icon: 'library_books' },
+  { label: 'Code Lookup', to: '/code-lookup', icon: 'search' },
 ]
 
 const RESTRICTED_PATHS = ['/', '/analyze']
+
+function isNavActive(pathname: string, to: string): boolean {
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
 
 export default function Navbar() {
   const { pathname } = useLocation()
@@ -37,7 +43,7 @@ export default function Navbar() {
   return (
     <>
       <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm">
-        <div className="flex justify-between items-center px-8 h-16 max-w-full mx-auto">
+        <div className="flex justify-between items-center px-4 md:px-8 h-16 max-w-full mx-auto">
           {needsLeaveConfirm ? (
             <button
               type="button"
@@ -53,7 +59,7 @@ export default function Navbar() {
           )}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium tracking-wide">
             {navLinks.map(({ label, to }) => {
-              const isActive = pathname === to
+              const isActive = isNavActive(pathname, to)
               return (
                 <Link
                   key={to}
@@ -92,6 +98,46 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
+
+      {!isRestricted && navLinks.length > 0 && (
+        <nav
+          className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 safe-area-pb"
+          aria-label="Main navigation"
+        >
+          <div className="flex items-stretch justify-around h-16 max-w-full mx-auto">
+            {navLinks.map(({ to, icon }) => {
+              const isActive = isNavActive(pathname, to)
+              const shortLabel =
+                to === '/action-plan'
+                  ? 'Plan'
+                  : to === '/appeal-drafting'
+                    ? 'Appeal'
+                    : to === '/indiana-resources'
+                      ? 'Indiana'
+                      : 'Codes'
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 px-1 transition-colors ${
+                    isActive ? 'text-primary' : 'text-slate-400'
+                  }`}
+                >
+                  <span
+                    className="material-symbols-outlined text-[22px]"
+                    style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                  >
+                    {icon}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-tighter truncate w-full text-center">
+                    {shortLabel}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
+      )}
 
       {showLeaveWarning && (
         <div

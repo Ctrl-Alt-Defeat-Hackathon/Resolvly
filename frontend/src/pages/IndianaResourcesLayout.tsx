@@ -10,7 +10,7 @@ export default function IndianaResourcesLayout() {
     >
       <Navbar />
 
-      <main className="flex-1 pt-24 pb-12">
+      <main className="flex-1 pt-24 pb-24 md:pb-12">
         <div className="editorial-margin">
           <Outlet />
         </div>

@@ -383,7 +383,7 @@ export default function ActionPlan() {
     <div className="bg-background text-on-background selection:bg-secondary-container antialiased min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="pt-24 pb-12 flex-grow">
+      <main className="pt-24 pb-24 md:pb-12 flex-grow">
         <div className="editorial-margin">
         {/* Header */}
         <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
