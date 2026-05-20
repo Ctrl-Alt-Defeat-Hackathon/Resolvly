@@ -50,6 +50,23 @@ export function loadAnalysisBundle(): StoredAnalysisBundle | null {
   }
 }
 
+export function hasActiveAnalysis(): boolean {
+  if (typeof sessionStorage === 'undefined') return false
+  return (
+    sessionStorage.getItem(STORAGE_KEYS.ANALYSIS_COMPLETE) === '1' ||
+    (!!sessionStorage.getItem(STORAGE_KEYS.CLAIM_OBJECT) &&
+      !!sessionStorage.getItem(STORAGE_KEYS.ANALYSIS))
+  )
+}
+
+/** Clear claim analysis and cached LLM outputs so the user can start fresh from home. */
+export function clearAnalysisSession(): void {
+  if (typeof sessionStorage === 'undefined') return
+  for (const key of Object.values(STORAGE_KEYS)) {
+    sessionStorage.removeItem(key)
+  }
+}
+
 export function saveAnalysisBundle(bundle: StoredAnalysisBundle): void {
   sessionStorage.setItem(STORAGE_KEYS.CLAIM_OBJECT, JSON.stringify(bundle.claim_object))
   sessionStorage.setItem(STORAGE_KEYS.ANALYSIS, JSON.stringify(bundle.analysis))
