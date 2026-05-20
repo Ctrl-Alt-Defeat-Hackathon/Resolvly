@@ -1,4 +1,20 @@
-const API = '/api/v1'
+/** Origin only, e.g. https://resolvly.onrender.com — not /api or /api/v1 */
+function normalizeApiOrigin(raw: string | undefined): string {
+  if (!raw?.trim()) return ''
+  let base = raw.trim().replace(/\/$/, '')
+  if (base.endsWith('/api/v1')) base = base.slice(0, -'/api/v1'.length)
+  else if (base.endsWith('/api')) base = base.slice(0, -'/api'.length)
+  return base
+}
+
+/**
+ * Empty = same-origin /api/v1 (Vite dev proxy or Vercel rewrite in vercel.json).
+ * Set VITE_API_URL for direct browser → Render calls (requires CORS on backend).
+ */
+const API_ORIGIN = normalizeApiOrigin(
+  import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL
+)
+const API = API_ORIGIN ? `${API_ORIGIN}/api/v1` : '/api/v1'
 
 async function handleJson<T>(res: Response): Promise<T> {
   const text = await res.text()
