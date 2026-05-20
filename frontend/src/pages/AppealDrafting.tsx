@@ -165,7 +165,7 @@ export default function AppealDrafting() {
     <div className="bg-background text-on-background selection:bg-secondary-container min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="pt-24 pb-12">
+      <main className="pt-24 pb-24 md:pb-12">
         {/* Warning Banner */}
         <div className="mx-8 mb-8">
           <div className="bg-tertiary-fixed text-on-tertiary-fixed p-4 rounded-xl flex items-center gap-3 shadow-sm">

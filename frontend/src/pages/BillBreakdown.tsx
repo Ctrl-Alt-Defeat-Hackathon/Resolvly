@@ -445,7 +445,7 @@ export default function BillBreakdown() {
     <div className="bg-background text-on-background selection:bg-secondary-container min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="pt-24 pb-12 flex-grow">
+      <main className="pt-24 pb-24 md:pb-12 flex-grow">
         <div className="editorial-margin">
         {/* Page header */}
         <div className="border-b border-slate-200 bg-white shadow-sm">
