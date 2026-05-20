@@ -2,17 +2,17 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { MarkdownContent } from '../components/MarkdownContent'
 import { analysisBundleFingerprint, loadAnalysisBundle } from '../lib/sessionKeys'
 import { postExportIcs } from '../lib/api'
 import {
   getCachedActionChecklist,
-  getCachedAppealLetter,
   getCachedCompleteness,
   getCachedDeadlines,
   getCachedProviderBrief,
   getCachedRoutingCard,
   getCachedSummary,
-  getCachedAssumptions,
+  prefetchSecondaryOutputs,
 } from '../lib/outputsCache'
 
 type StepRow = {
@@ -243,47 +243,39 @@ export default function ActionPlan() {
       setDeadlineInfo([])
       return
     }
+
+    let cancelled = false
+    const { claim_object, analysis, enrichment } = bundle
+
     setRoutingState({ loading: true, error: null, data: null })
     setCompletenessState({ loading: true, error: null, data: null })
     setProviderBriefState({ loading: true, error: null, brief_text: '' })
-    getCachedRoutingCard(bundle.claim_object, bundle.analysis, bundle.enrichment)
-      .then(data => setRoutingState({ loading: false, error: null, data }))
-      .catch(() =>
-        setRoutingState({
-          loading: false,
-          error: 'Could not load regulatory routing card.',
-          data: null,
-        })
-      )
-    getCachedCompleteness(bundle.claim_object, bundle.analysis, bundle.enrichment)
-      .then(data => setCompletenessState({ loading: false, error: null, data }))
-      .catch(() =>
-        setCompletenessState({
-          loading: false,
-          error: 'Could not load denial-letter completeness report.',
-          data: null,
-        })
-      )
-
-    getCachedProviderBrief(bundle.claim_object, bundle.analysis, bundle.enrichment)
-      .then(res =>
-        setProviderBriefState({
-          loading: false,
-          error: null,
-          brief_text: String(res.brief_text ?? '').trim(),
-        })
-      )
-      .catch(() =>
-        setProviderBriefState({
-          loading: false,
-          error: 'Could not load provider brief. Ensure GROQ_API_KEY or GEMINI_API_KEY is set on the server.',
-          brief_text: '',
-        })
-      )
-
     setSummaryState(s => ({ ...s, loading: true, error: null }))
-    getCachedSummary(bundle.claim_object, bundle.analysis, bundle.enrichment)
-      .then(res =>
+
+    // Instant / rule-based sections
+    getCachedCompleteness(claim_object, analysis, enrichment)
+      .then(data => {
+        if (!cancelled) setCompletenessState({ loading: false, error: null, data })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCompletenessState({ loading: false, error: 'Could not load completeness report.', data: null })
+        }
+      })
+
+    getCachedDeadlines(claim_object, analysis)
+      .then(r => {
+        if (!cancelled) setDeadlineInfo(r.deadlines ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setDeadlineInfo([])
+      })
+
+    // Action Plan LLM — parallel; each section renders as its request completes
+    const patientInfo = buildPatientInfo(claim_object)
+    const actionPlanLlm = Promise.allSettled([
+      getCachedSummary(claim_object, analysis, enrichment).then(res => {
+        if (cancelled) return
         setSummaryState({
           loading: false,
           error: null,
@@ -291,47 +283,66 @@ export default function ActionPlan() {
           reading_level: res.reading_level ?? '',
           key_points: Array.isArray(res.key_points) ? res.key_points : [],
         })
-      )
-      .catch(() =>
-        setSummaryState({
-          loading: false,
-          error: 'Could not load summary. Check that analysis completed and the server has GROQ_API_KEY or GEMINI_API_KEY set.',
-          summary_text: '',
-          reading_level: '',
-          key_points: [],
-        })
-      )
-
-    getCachedActionChecklist(bundle.claim_object, bundle.analysis, bundle.enrichment)
-      .then(res => {
+      }),
+      getCachedActionChecklist(claim_object, analysis, enrichment).then(res => {
+        if (cancelled) return
         const raw = res.steps ?? []
         if (!raw.length) {
           setSteps(FALLBACK_STEPS)
           return
         }
-        const mapped: StepRow[] = raw.map((s, i) => ({
-          num: Number(s.number ?? i + 1),
-          title: String(s.action ?? ''),
-          ...(i === 0 ? { tag: 'Critical', tagClass: 'bg-primary-fixed text-on-primary-fixed' } : {}),
-          desc: String(s.detail ?? ''),
-          why: String(s.why ?? ''),
-          active: i === 0,
-        }))
-        setSteps(mapped)
-      })
-      .catch(() => setSteps(FALLBACK_STEPS))
+        setSteps(
+          raw.map((s, i) => ({
+            num: Number(s.number ?? i + 1),
+            title: String(s.action ?? ''),
+            ...(i === 0 ? { tag: 'Critical', tagClass: 'bg-primary-fixed text-on-primary-fixed' } : {}),
+            desc: String(s.detail ?? ''),
+            why: String(s.why ?? ''),
+            active: i === 0,
+          }))
+        )
+      }),
+      getCachedProviderBrief(claim_object, analysis, enrichment).then(res => {
+        if (cancelled) return
+        setProviderBriefState({
+          loading: false,
+          error: null,
+          brief_text: String(res.brief_text ?? '').trim(),
+        })
+      }),
+      getCachedRoutingCard(claim_object, analysis, enrichment).then(data => {
+        if (!cancelled) setRoutingState({ loading: false, error: null, data })
+      }),
+    ])
 
-    getCachedDeadlines(bundle.claim_object, bundle.analysis)
-      .then(r => setDeadlineInfo(r.deadlines ?? []))
-      .catch(() => setDeadlineInfo([]))
+    actionPlanLlm.then(results => {
+      if (cancelled) return
+      if (results[0].status === 'rejected') {
+        setSummaryState({
+          loading: false,
+          error: 'Could not load summary. Check OPENAI_API_KEY and backend logs.',
+          summary_text: '',
+          reading_level: '',
+          key_points: [],
+        })
+      }
+      if (results[1].status === 'rejected') setSteps(FALLBACK_STEPS)
+      if (results[2].status === 'rejected') {
+        setProviderBriefState({
+          loading: false,
+          error: 'Could not load provider brief. Ensure OPENAI_API_KEY is set on the server.',
+          brief_text: '',
+        })
+      }
+      if (results[3].status === 'rejected') {
+        setRoutingState({ loading: false, error: 'Could not load regulatory routing card.', data: null })
+      }
+      void prefetchSecondaryOutputs(claim_object, analysis, enrichment, patientInfo)
+    })
 
-    // Prefetch appeal letter in background so AppealDrafting opens faster.
-    // Do not block this page on the result.
-    const patientInfo = buildPatientInfo(bundle.claim_object)
-    void getCachedAppealLetter(bundle.claim_object, bundle.analysis, bundle.enrichment, patientInfo)
-
-    // Prefetch assumptions panel in background so the sidebar loads instantly.
-    void getCachedAssumptions(bundle.claim_object, bundle.analysis, bundle.enrichment)
+    return () => {
+      cancelled = true
+    }
   }, [bundle, bundleFingerprint])
 
   async function downloadIcs(which: 'internal' | 'external') {
@@ -653,9 +664,7 @@ export default function ActionPlan() {
               )}
               {!providerBriefState.loading && !providerBriefState.error && providerBriefState.brief_text && (
                 <div className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-3 max-h-[min(20rem,42vh)] overflow-y-auto overscroll-contain">
-                  <pre className="text-xs whitespace-pre-wrap font-sans text-on-surface leading-relaxed">
-                    {providerBriefState.brief_text}
-                  </pre>
+                  <MarkdownContent content={providerBriefState.brief_text} />
                 </div>
               )}
               {!providerBriefState.loading && !providerBriefState.error && !providerBriefState.brief_text && bundle && (

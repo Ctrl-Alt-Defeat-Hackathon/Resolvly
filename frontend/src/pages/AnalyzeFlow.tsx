@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import { uploadDocuments, extractEntities, analyzeClaim, wizardPlanType } from '../lib/api'
 import { buildPlanContext, buildWizardBody, canSubmitPlan } from '../lib/planMapping'
 import { STORAGE_KEYS, saveAnalysisBundle } from '../lib/sessionKeys'
+import { prefetchActionPlanOutputs, prefetchSecondaryOutputs } from '../lib/outputsCache'
 
 export const RESOLVLY_ANALYSIS_COMPLETE_KEY = STORAGE_KEYS.ANALYSIS_COMPLETE
 
@@ -62,54 +63,25 @@ function typeLabelForKind(k: DocKind): string {
 
 // ─── Processing (after Begin Forensic Analysis) ──────────────────────────────
 const PIPELINE_STAGES = [
-  { id: 'extraction', label: 'Document text extracted', detail: null as string[] | null },
+  { id: 'upload', label: 'Uploading documents to secure analysis server', detail: null as string[] | null },
+  { id: 'extraction', label: 'Document text extracted', detail: null },
   { id: 'entities', label: 'Extracting claim identifiers, codes, dates, and amounts', detail: null },
   { id: 'codes', label: 'Resolving billing and denial codes (CMS / authoritative references)', detail: null },
   { id: 'federal', label: 'Searching federal regulations (eCFR)', detail: null },
   { id: 'state', label: 'Checking state DOI resources and routing', detail: null },
   { id: 'analysis', label: 'Running root cause and deadline analysis', detail: null },
-  { id: 'generating', label: 'Generating your results', detail: null },
+  { id: 'generating', label: 'Saving your results', detail: null },
 ]
 
 function ProcessingView({
-  onComplete,
-  onError,
-  runPipeline,
+  completedCount,
+  done,
   errorText,
 }: {
-  onComplete: () => void
-  onError: (msg: string) => void
-  runPipeline: () => Promise<void>
+  completedCount: number
+  done: boolean
   errorText: string | null
 }) {
-  const [completedCount, setCompletedCount] = useState(0)
-  const [done, setDone] = useState(false)
-
-  useEffect(() => {
-    let iv: ReturnType<typeof setInterval> | undefined
-    const t = window.setTimeout(() => {
-      iv = setInterval(() => {
-        setCompletedCount(c => Math.min(c + 1, PIPELINE_STAGES.length - 1))
-      }, 1400)
-    }, 400)
-    ;(async () => {
-      try {
-        await runPipeline()
-        clearInterval(iv)
-        setCompletedCount(PIPELINE_STAGES.length)
-        setDone(true)
-        window.setTimeout(() => onComplete(), 1200)
-      } catch (e) {
-        clearInterval(iv)
-        onError(e instanceof Error ? e.message : String(e))
-      }
-    })()
-    return () => {
-      clearTimeout(t)
-      if (iv) clearInterval(iv)
-    }
-  }, [runPipeline, onComplete, onError])
-
   const progress = Math.round((completedCount / PIPELINE_STAGES.length) * 100)
 
   return (
@@ -121,7 +93,7 @@ function ProcessingView({
         <p className="text-on-surface-variant">
           {errorText
             ? <span className="text-red-600">{errorText}</span>
-            : (done ? 'Loading your results...' : 'This usually takes 10–15 seconds.')}
+            : (done ? 'Loading your results...' : 'Working through each step — this may take 1–2 minutes.')}
         </p>
       </header>
 
@@ -133,7 +105,7 @@ function ProcessingView({
         <div className="p-8 space-y-5">
           {PIPELINE_STAGES.map((stage, i) => {
             const isDone = i < completedCount
-            const isActive = i === completedCount
+            const isActive = i === completedCount && !done && !errorText
             const isPending = i > completedCount
             return (
               <div key={stage.id} className={`transition-all duration-300 ${isPending ? 'opacity-40' : 'opacity-100'}`}>
@@ -155,7 +127,6 @@ function ProcessingView({
                       </ul>
                     )}
                   </div>
-                  {isDone && <span className="text-xs text-slate-300 shrink-0">{(1.2 + i * 1.3).toFixed(1)}s</span>}
                 </div>
               </div>
             )
@@ -179,17 +150,18 @@ export default function AnalyzeFlow() {
   const [phase, setPhase] = useState<'wizard' | 'processing'>('wizard')
 
   const [files, setFiles] = useState<UploadedFile[]>([])
-  // Track which card is being dragged over (for per-card drag highlight)
   const [draggingKind, setDraggingKind] = useState<DocKind | null>(null)
   const [pipelineError, setPipelineError] = useState<string | null>(null)
+  const [completedCount, setCompletedCount] = useState(0)
+  const [pipelineDone, setPipelineDone] = useState(false)
 
   const [planType, setPlanType] = useState<string>('')
   const [funding, setFunding] = useState<string>('')
 
-  // One hidden file input per document type
   const denialRef = useRef<HTMLInputElement>(null)
   const eobRef = useRef<HTMLInputElement>(null)
   const medBillRef = useRef<HTMLInputElement>(null)
+  const pipelineRunningRef = useRef(false)
 
   function getInputRef(kind: DocKind): React.RefObject<HTMLInputElement | null> {
     if (kind === 'denial') return denialRef
@@ -203,13 +175,11 @@ export default function AnalyzeFlow() {
     }
   }, [navigate])
 
-  /** Add (or replace) the file for the given document slot. Only the first file is used. */
   function addFileForKind(kind: DocKind, fileList: FileList | null) {
     if (!fileList?.length) return
     const file = fileList[0]
     const base = baseNameForKind(kind)
     setFiles(prev => {
-      // Replace any existing file for this kind
       const filtered = prev.filter(f => f.docKind !== kind)
       const newEntry: UploadedFile = {
         id: crypto.randomUUID(),
@@ -244,66 +214,98 @@ export default function AnalyzeFlow() {
     sessionStorage.setItem(STORAGE_KEYS.DOC_PROFILE, JSON.stringify(payload))
   }
 
-  const onProcessingComplete = useCallback(() => {
+  const finishAndNavigate = useCallback(() => {
     sessionStorage.setItem(RESOLVLY_ANALYSIS_COMPLETE_KEY, '1')
-    const payload = {
-      files: files.map(f => ({ id: f.id, name: f.name, docKind: f.docKind })),
-      kindsPresent: {
-        eob: files.some(f => f.docKind === 'eob'),
-        denial: files.some(f => f.docKind === 'denial'),
-        medical_bill: files.some(f => f.docKind === 'medical_bill'),
-      },
-    }
-    sessionStorage.setItem(STORAGE_KEYS.DOC_PROFILE, JSON.stringify(payload))
+    persistDocProfileForResults()
     navigate('/action-plan')
   }, [navigate, files])
 
   const runPipeline = useCallback(async () => {
+    if (pipelineRunningRef.current) return
+    pipelineRunningRef.current = true
+
     const plan_context = buildPlanContext(planType, funding)
     const fileBlobs = files.map(f => f.file).filter((x): x is File => !!x)
     if (fileBlobs.length === 0) {
+      pipelineRunningRef.current = false
       throw new Error('Each file must be a real upload from your device.')
     }
-    const up = await uploadDocuments(fileBlobs)
-    const documents = up.documents.map(d => ({
-      doc_id: d.doc_id,
-      text_extracted: d.text_extracted,
-    }))
-    const ext = await extractEntities({
-      upload_id: up.upload_id,
-      documents,
-      plan_context: plan_context as Record<string, unknown>,
-    })
-    let wizard: Record<string, unknown> | null = null
-    try {
-      const wb = buildWizardBody(planType, funding)
-      const payload: Record<string, string> =
-        wb.source === 'employer'
-          ? { source: wb.source, state: wb.state, employer_plan_type: wb.employer_plan_type }
-          : { source: wb.source, state: wb.state }
-      wizard = await wizardPlanType(payload as { source: string; state: string; employer_plan_type?: string })
-    } catch {
-      wizard = null
-    }
-    const analyzed = await analyzeClaim(
-      ext.claim_object as Record<string, unknown>,
-      plan_context as Record<string, unknown>
-    )
-    saveAnalysisBundle({
-      claim_object: analyzed.claim_object,
-      analysis: analyzed.analysis,
-      enrichment: analyzed.enrichment,
-      sources: analyzed.sources,
-      plan_context: plan_context as Record<string, unknown>,
-      wizard,
-    })
-  }, [files, planType, funding])
 
-  // All 3 document types must be uploaded, plus plan selections filled
+    try {
+      // Stage 0: upload (starts immediately on button click)
+      setCompletedCount(0)
+      const up = await uploadDocuments(fileBlobs)
+      setCompletedCount(1)
+
+      const documents = up.documents.map(d => ({
+        doc_id: d.doc_id,
+        text_extracted: d.text_extracted,
+      }))
+
+      // Stage 1–2: entity extraction (includes LLM pass)
+      const ext = await extractEntities({
+        upload_id: up.upload_id,
+        documents,
+        plan_context: plan_context as Record<string, unknown>,
+      })
+      setCompletedCount(3)
+
+      // Stage 3–5: plan wizard + full claim analysis (codes, regulations, state rules)
+      let wizard: Record<string, unknown> | null = null
+      try {
+        const wb = buildWizardBody(planType, funding)
+        const payload: Record<string, string> =
+          wb.source === 'employer'
+            ? { source: wb.source, state: wb.state, employer_plan_type: wb.employer_plan_type }
+            : { source: wb.source, state: wb.state }
+        wizard = await wizardPlanType(payload as { source: string; state: string; employer_plan_type?: string })
+      } catch {
+        wizard = null
+      }
+      setCompletedCount(6)
+
+      const analyzed = await analyzeClaim(
+        ext.claim_object as Record<string, unknown>,
+        plan_context as Record<string, unknown>
+      )
+      setCompletedCount(7)
+
+      saveAnalysisBundle({
+        claim_object: analyzed.claim_object,
+        analysis: analyzed.analysis,
+        enrichment: analyzed.enrichment,
+        sources: analyzed.sources,
+        plan_context: plan_context as Record<string, unknown>,
+        wizard,
+      })
+      setCompletedCount(PIPELINE_STAGES.length)
+      setPipelineDone(true)
+
+      // Warm caches in the background — does not block navigation to Action Plan.
+      const co = analyzed.claim_object as Record<string, unknown>
+      const an = analyzed.analysis as Record<string, unknown>
+      const en = analyzed.enrichment as Record<string, unknown>
+      void prefetchActionPlanOutputs(co, an, en).then(() => prefetchSecondaryOutputs(co, an, en))
+
+      window.setTimeout(() => finishAndNavigate(), 400)
+    } finally {
+      pipelineRunningRef.current = false
+    }
+  }, [files, planType, funding, finishAndNavigate])
+
+  const beginAnalysis = useCallback(() => {
+    setPipelineError(null)
+    setCompletedCount(0)
+    setPipelineDone(false)
+    setPhase('processing')
+    void runPipeline().catch(e => {
+      setPipelineError(e instanceof Error ? e.message : String(e))
+    })
+  }, [runPipeline])
+
   const allDocsUploaded = DOC_KIND_ORDER.every(k => !!getFileForKind(k)?.file)
   const canAnalyze = allDocsUploaded && canSubmitPlan(planType, funding)
 
-  // What's still missing (for helper text near the button)
   const missingDocs = DOC_KIND_ORDER.filter(k => !getFileForKind(k))
   const missingPlan = !planType
   const missingFunding = planType === 'employer' && !funding
@@ -315,10 +317,9 @@ export default function AnalyzeFlow() {
         <div className="editorial-margin">
           {phase === 'processing' ? (
             <ProcessingView
+              completedCount={completedCount}
+              done={pipelineDone}
               errorText={pipelineError}
-              runPipeline={runPipeline}
-              onError={setPipelineError}
-              onComplete={onProcessingComplete}
             />
           ) : (
             <div className="w-full space-y-12">
@@ -338,7 +339,6 @@ export default function AnalyzeFlow() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
 
-                  {/* ── Left column: Policy Intelligence ── */}
                   <section className="lg:col-span-4 space-y-6 min-w-0">
                     <div className="bg-surface-container-low p-8 rounded-xl space-y-8">
                       <div className="space-y-2">
@@ -407,7 +407,6 @@ export default function AnalyzeFlow() {
                     </div>
                   </section>
 
-                  {/* ── Right column: Document Upload ── */}
                   <section className="lg:col-span-8 flex flex-col gap-6 min-w-0 w-full">
 
                     <div className="space-y-2">
@@ -417,7 +416,6 @@ export default function AnalyzeFlow() {
                       </p>
                     </div>
 
-                    {/* ── 3 Document Upload Cards ── */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {DOC_KIND_ORDER.map(kind => {
                         const config = DOC_KIND_CONFIG[kind]
@@ -453,7 +451,6 @@ export default function AnalyzeFlow() {
                                   : 'bg-surface-container-lowest border-outline-variant/40 border-dashed hover:border-primary/60 hover:bg-primary/5'
                               }`}
                           >
-                            {/* Hidden file input for this slot */}
                             <input
                               ref={getInputRef(kind) as React.RefObject<HTMLInputElement>}
                               type="file"
@@ -466,7 +463,6 @@ export default function AnalyzeFlow() {
                             />
 
                             {isUploaded ? (
-                              /* ── Uploaded (green) state ── */
                               <div className="flex flex-col h-full p-5 gap-3">
                                 <div className="flex items-start justify-between">
                                   <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
@@ -493,7 +489,6 @@ export default function AnalyzeFlow() {
                                 </p>
                               </div>
                             ) : (
-                              /* ── Empty (blue) state ── */
                               <div className="flex flex-col items-center text-center p-5 py-8 gap-4 h-full">
                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors
                                   ${isDraggingOver ? 'bg-primary text-white' : 'bg-primary/10'}`}>
@@ -516,7 +511,6 @@ export default function AnalyzeFlow() {
                       })}
                     </div>
 
-                    {/* ── Upload progress summary ── */}
                     <div className="flex items-center gap-3 px-1">
                       {DOC_KIND_ORDER.map(kind => {
                         const isUploaded = !!getFileForKind(kind)
@@ -536,16 +530,13 @@ export default function AnalyzeFlow() {
                       </span>
                     </div>
 
-                    {/* ── Begin Forensic Analysis button + helper text ── */}
                     <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 pt-2 w-full">
                       <button
                         type="button"
                         disabled={!canAnalyze}
                         onClick={() => {
                           if (!canAnalyze) return
-                          setPipelineError(null)
-                          persistDocProfileForResults()
-                          setPhase('processing')
+                          beginAnalysis()
                         }}
                         className={`text-white w-full md:w-auto shrink-0 px-10 py-4 rounded-xl font-bold font-headline text-lg shadow-lg transition-all flex items-center justify-center gap-3
                           ${canAnalyze
@@ -556,7 +547,6 @@ export default function AnalyzeFlow() {
                         <span className="material-symbols-outlined">analytics</span>
                       </button>
 
-                      {/* Helper text explaining what's still needed */}
                       <div className="text-xs text-on-surface-variant leading-relaxed text-center md:text-left md:max-w-xs md:pt-1 space-y-1">
                         {!canAnalyze ? (
                           <div className="space-y-1">

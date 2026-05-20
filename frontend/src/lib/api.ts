@@ -199,11 +199,21 @@ export async function postExportIcs(body: {
 export async function postExportPdf(body: { content: string; format: string; title?: string }) {
   const res = await fetch(`${API}/export/pdf`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(await res.text())
-  return res.blob()
+  if (!res.ok) {
+    const text = await res.text()
+    try {
+      const err = JSON.parse(text) as { detail?: string }
+      throw new Error(err.detail ?? text)
+    } catch {
+      throw new Error(text || res.statusText || `HTTP ${res.status}`)
+    }
+  }
+  const blob = await res.blob()
+  if (!blob.size) throw new Error('PDF export returned an empty file')
+  return blob
 }
 
 /** POST /outputs/assumptions — structured panel from analysis.assumptions */

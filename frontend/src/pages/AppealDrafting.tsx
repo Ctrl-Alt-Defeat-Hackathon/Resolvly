@@ -39,6 +39,8 @@ export default function AppealDrafting() {
   const bundle = useMemo(() => loadAnalysisBundle(), [bundleFingerprint])
   const [drafts, setDrafts] = useState<[string, string, string]>(['', '', ''])
   const [draftLoading, setDraftLoading] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportingPdf, setExportingPdf] = useState(false)
   const [assumptionsState, setAssumptionsState] = useState<{
     loading: boolean
     error: string | null
@@ -90,7 +92,7 @@ export default function AppealDrafting() {
         setDrafts([
           typeof r.appeal_letter === 'string' && r.appeal_letter.trim()
             ? r.appeal_letter
-            : 'The output agent did not return an appeal letter. Check GROQ_API_KEY (or GEMINI_API_KEY) and backend logs.',
+            : 'The output agent did not return an appeal letter. Check OPENAI_API_KEY and backend logs.',
           typeof r.provider_message === 'string' && r.provider_message.trim()
             ? r.provider_message
             : 'No provider message returned.',
@@ -116,16 +118,33 @@ export default function AppealDrafting() {
   }
 
   async function exportPdf() {
-    const content = drafts[activeTab]
+    const content = drafts[activeTab]?.trim() ?? ''
+    if (!content || draftLoading) {
+      setExportError('Nothing to export yet. Wait for the draft to finish loading.')
+      return
+    }
+    const formatByTab = ['appeal_letter', 'provider_brief', 'appeal_letter'] as const
+    const filenameByTab = ['appeal-draft.pdf', 'provider-message.pdf', 'insurer-message.pdf']
+    setExportError(null)
+    setExportingPdf(true)
     try {
-      const blob = await postExportPdf({ content, format: 'appeal_letter', title: 'Appeal draft' })
+      const blob = await postExportPdf({
+        content,
+        format: formatByTab[activeTab] ?? 'appeal_letter',
+        title: tabs[activeTab] ?? 'Appeal draft',
+      })
+      const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = 'appeal-draft.pdf'
+      a.href = url
+      a.download = filenameByTab[activeTab] ?? 'appeal-draft.pdf'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(a.href)
-    } catch {
-      /* silent */
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'PDF export failed. Is the backend running?')
+    } finally {
+      setExportingPdf(false)
     }
   }
 
@@ -197,11 +216,20 @@ export default function AppealDrafting() {
                     <button type="button" onClick={() => downloadTxt()} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-container rounded-lg text-primary transition-colors text-sm font-medium">
                       <span className="material-symbols-outlined text-[20px]">download</span> .txt
                     </button>
-                    <button type="button" onClick={() => void exportPdf()} className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg transition-all hover:opacity-90 text-sm font-medium">
-                      <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span> PDF Export
+                    <button
+                      type="button"
+                      disabled={draftLoading || exportingPdf}
+                      onClick={() => void exportPdf()}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg transition-all hover:opacity-90 text-sm font-medium disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                      {exportingPdf ? 'Exporting…' : 'PDF Export'}
                     </button>
                   </div>
                 </div>
+                {exportError && (
+                  <p className="px-6 pb-3 text-xs text-error border-b border-surface-container">{exportError}</p>
+                )}
 
                 {/* Paper */}
                 <div

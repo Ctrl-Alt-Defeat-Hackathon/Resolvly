@@ -5,6 +5,7 @@ POST /api/v1/export/pdf  → Generate PDF from markdown content
 POST /api/v1/export/ics  → Generate .ics calendar file for a deadline
 """
 
+import inspect
 import io
 import logging
 import re
@@ -41,6 +42,28 @@ class ICSExportRequest(BaseModel):
 # PDF export
 # ---------------------------------------------------------------------------
 
+_UNICODE_REPLACEMENTS: dict[str, str] = {
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u2013": "-",
+    "\u2014": "--",
+    "\u2022": "-",
+    "\u2026": "...",
+    "\u00a0": " ",
+}
+
+
+def _pdf_safe_text(text: str) -> str:
+    """Helvetica in fpdf2 is Latin-1 only — normalize common Unicode from LLM output."""
+    if not text:
+        return text
+    for src, dst in _UNICODE_REPLACEMENTS.items():
+        text = text.replace(src, dst)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
 def _markdown_to_plain_lines(markdown: str) -> list[tuple[str, str]]:
     """
     Convert markdown to a list of (style, text) tuples for FPDF rendering.
@@ -70,7 +93,7 @@ def _markdown_to_plain_lines(markdown: str) -> list[tuple[str, str]]:
             clean = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", clean)
             lines.append(("body", clean))
 
-    return lines
+    return [(style, _pdf_safe_text(text) if text else text) for style, text in lines]
 
 
 def _generate_pdf(content: str, title: str, doc_format: str) -> bytes:
@@ -90,11 +113,14 @@ def _generate_pdf(content: str, title: str, doc_format: str) -> bytes:
 
     # Header
     pdf.set_font("Helvetica", style="B", size=14)
-    display_title = title or {
-        "appeal_letter": "Insurance Appeal Letter",
-        "provider_brief": "Provider Brief",
-        "summary": "Denial Summary",
-    }.get(doc_format, "Insurance Document")
+    display_title = _pdf_safe_text(
+        title
+        or {
+            "appeal_letter": "Insurance Appeal Letter",
+            "provider_brief": "Provider Brief",
+            "summary": "Denial Summary",
+        }.get(doc_format, "Insurance Document")
+    )
     pdf.cell(0, 10, display_title, ln=True, align="C")
     pdf.ln(4)
 
@@ -129,14 +155,26 @@ def _generate_pdf(content: str, title: str, doc_format: str) -> bytes:
             # Handle bullet points
             stripped = text.strip()
             if stripped.startswith("- ") or stripped.startswith("* "):
-                bullet_text = "  \u2022  " + stripped[2:]
+                bullet_text = "  - " + stripped[2:]
                 pdf.multi_cell(page_width, 5, bullet_text)
             elif re.match(r"^\d+\.\s", stripped):
                 pdf.multi_cell(page_width, 5, "  " + stripped)
             else:
                 pdf.multi_cell(page_width, 5, text)
 
-    return bytes(pdf.output())
+    return _pdf_output_bytes(pdf)
+
+
+def _pdf_output_bytes(pdf) -> bytes:
+    """Support fpdf2 (bytes from output()) and legacy PyFPDF 1.7 (dest='S' string)."""
+    params = inspect.signature(pdf.output).parameters
+    if "dest" in params:
+        out = pdf.output(dest="S")
+    else:
+        out = pdf.output()
+    if isinstance(out, (bytes, bytearray)):
+        return bytes(out)
+    return str(out).encode("latin-1")
 
 
 @router.post("/pdf")

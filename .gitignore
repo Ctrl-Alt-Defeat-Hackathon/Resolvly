@@ -33,3 +33,4 @@ docker-compose.override.yml
 
 # Local frontend backup snapshot (not shipped with the app)
 frontend.local.bak
+.DS_Store
