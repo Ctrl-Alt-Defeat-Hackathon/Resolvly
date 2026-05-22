@@ -4,6 +4,15 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { uploadDocuments, extractEntities, analyzeClaim, wizardPlanType } from '../lib/api'
 import { buildPlanContext, buildWizardBody, canSubmitPlan } from '../lib/planMapping'
+import {
+  DEMO_CASES,
+  DEMO_CASE_SESSION_KEY,
+  DEMO_MODE_SESSION_KEY,
+  DEMO_OFFER_SESSION_KEY,
+  fetchDemoCaseFiles,
+  fetchDemoFile,
+  type DemoCaseId,
+} from '../lib/demoDocuments'
 import { STORAGE_KEYS, saveAnalysisBundle } from '../lib/sessionKeys'
 import { prefetchActionPlanOutputs, prefetchSecondaryOutputs } from '../lib/outputsCache'
 
@@ -158,6 +167,19 @@ export default function AnalyzeFlow() {
   const [planType, setPlanType] = useState<string>('')
   const [funding, setFunding] = useState<string>('')
 
+  const [showDemoOffer, setShowDemoOffer] = useState(
+    () => sessionStorage.getItem(DEMO_OFFER_SESSION_KEY) !== '1',
+  )
+  const [demoMode, setDemoMode] = useState(
+    () => sessionStorage.getItem(DEMO_MODE_SESSION_KEY) === '1',
+  )
+  const [activeDemoCase, setActiveDemoCase] = useState<DemoCaseId>(() => {
+    const saved = sessionStorage.getItem(DEMO_CASE_SESSION_KEY) as DemoCaseId | null
+    return saved && DEMO_CASES.some(c => c.id === saved) ? saved : 'default'
+  })
+  const [demoLoading, setDemoLoading] = useState<DocKind | DemoCaseId | null>(null)
+  const [demoError, setDemoError] = useState<string | null>(null)
+
   const denialRef = useRef<HTMLInputElement>(null)
   const eobRef = useRef<HTMLInputElement>(null)
   const medBillRef = useRef<HTMLInputElement>(null)
@@ -175,15 +197,13 @@ export default function AnalyzeFlow() {
     }
   }, [navigate])
 
-  function addFileForKind(kind: DocKind, fileList: FileList | null) {
-    if (!fileList?.length) return
-    const file = fileList[0]
+  function applyFileForKind(kind: DocKind, file: File, displayName?: string) {
     const base = baseNameForKind(kind)
     setFiles(prev => {
       const filtered = prev.filter(f => f.docKind !== kind)
       const newEntry: UploadedFile = {
         id: crypto.randomUUID(),
-        name: `${base}.pdf`,
+        name: displayName ?? file.name ?? `${base}.pdf`,
         size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
         type: typeLabelForKind(kind),
         status: 'extracted',
@@ -192,6 +212,89 @@ export default function AnalyzeFlow() {
       }
       return [...filtered, newEntry]
     })
+  }
+
+  function addFileForKind(kind: DocKind, fileList: FileList | null) {
+    if (!fileList?.length) return
+    if (demoMode) exitDemoMode()
+    applyFileForKind(kind, fileList[0])
+  }
+
+  function applyAllDemoFiles(caseFiles: Record<DocKind, File>) {
+    setFiles(prev => {
+      const filtered = prev.filter(f => !DOC_KIND_ORDER.includes(f.docKind))
+      const newEntries: UploadedFile[] = DOC_KIND_ORDER.map(kind => {
+        const file = caseFiles[kind]
+        const base = baseNameForKind(kind)
+        return {
+          id: crypto.randomUUID(),
+          name: file.name ?? `${base}.pdf`,
+          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          type: typeLabelForKind(kind),
+          status: 'extracted',
+          docKind: kind,
+          file,
+        }
+      })
+      return [...filtered, ...newEntries]
+    })
+  }
+
+  function acceptDemoMode() {
+    sessionStorage.setItem(DEMO_OFFER_SESSION_KEY, '1')
+    sessionStorage.setItem(DEMO_MODE_SESSION_KEY, '1')
+    setDemoMode(true)
+    setShowDemoOffer(false)
+    setDemoError(null)
+  }
+
+  function declineDemoMode() {
+    sessionStorage.setItem(DEMO_OFFER_SESSION_KEY, '1')
+    sessionStorage.setItem(DEMO_MODE_SESSION_KEY, '0')
+    setDemoMode(false)
+    setShowDemoOffer(false)
+  }
+
+  function exitDemoMode() {
+    sessionStorage.setItem(DEMO_MODE_SESSION_KEY, '0')
+    setDemoMode(false)
+    setDemoError(null)
+  }
+
+  async function loadDemoDocForKind(kind: DocKind) {
+    setDemoError(null)
+    setDemoLoading(kind)
+    try {
+      const file = await fetchDemoFile(activeDemoCase, kind)
+      applyFileForKind(kind, file)
+    } catch (e) {
+      setDemoError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDemoLoading(null)
+    }
+  }
+
+  async function loadFullDemoCase(caseId: DemoCaseId) {
+    setDemoError(null)
+    setDemoLoading(caseId)
+    setActiveDemoCase(caseId)
+    sessionStorage.setItem(DEMO_CASE_SESSION_KEY, caseId)
+    try {
+      const caseFiles = await fetchDemoCaseFiles(caseId)
+      applyAllDemoFiles(caseFiles)
+    } catch (e) {
+      setDemoError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDemoLoading(null)
+    }
+  }
+
+  async function handleUploadCardClick(kind: DocKind) {
+    if (demoMode) {
+      await loadDemoDocForKind(kind)
+      return
+    }
+    getInputRef(kind).current?.click()
   }
 
   function removeFileByKind(kind: DocKind) {
@@ -315,6 +418,44 @@ export default function AnalyzeFlow() {
       <Navbar />
       <main className="flex-grow w-full min-w-0 pt-24 pb-12">
         <div className="editorial-margin">
+          {showDemoOffer && phase === 'wizard' && (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="demo-offer-title"
+            >
+              <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 border border-slate-200">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-5">
+                  <span className="material-symbols-outlined text-primary text-2xl">science</span>
+                </div>
+                <h2 id="demo-offer-title" className="text-2xl font-extrabold font-headline text-primary mb-3">
+                  Try Resolvly with demo documents?
+                </h2>
+                <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
+                  You can explore a full analysis using sample denial letters, EOBs, and medical bills—no personal documents needed.
+                  Choose demo mode to load files with one click on each upload card, or upload your own files instead.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void acceptDemoMode()}
+                    className="signature-cta text-white flex-1 px-5 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all"
+                  >
+                    Use demo documents
+                  </button>
+                  <button
+                    type="button"
+                    onClick={declineDemoMode}
+                    className="flex-1 px-5 py-3 rounded-xl font-bold text-sm border border-slate-200 text-on-surface hover:bg-slate-50 transition-colors"
+                  >
+                    Upload my own
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {phase === 'processing' ? (
             <ProcessingView
               completedCount={completedCount}
@@ -412,9 +553,69 @@ export default function AnalyzeFlow() {
                     <div className="space-y-2">
                       <h2 className="text-xl font-bold font-headline text-primary">Upload Your Documents</h2>
                       <p className="text-sm text-on-surface-variant">
-                        All three documents are required for a complete forensic analysis. Click each card to upload the corresponding file.
+                        {demoMode
+                          ? 'Demo mode: click a document card to load that sample file, or pick a full demo case below.'
+                          : 'All three documents are required for a complete forensic analysis. Click each card to upload the corresponding file.'}
                       </p>
                     </div>
+
+                    {demoMode && (
+                      <div className="rounded-xl border border-primary/25 bg-primary/5 p-5 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-primary flex items-center gap-2">
+                              <span className="material-symbols-outlined text-base">folder_special</span>
+                              Demo document sets
+                            </p>
+                            <p className="text-xs text-on-surface-variant mt-1">
+                              Load all three files at once, or click an individual card above for one document.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={exitDemoMode}
+                            className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 shrink-0 self-start"
+                          >
+                            Switch to my own uploads
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {DEMO_CASES.map(demoCase => {
+                            const isActive = activeDemoCase === demoCase.id
+                            const isLoading = demoLoading === demoCase.id
+                            return (
+                              <button
+                                key={demoCase.id}
+                                type="button"
+                                disabled={!!demoLoading}
+                                onClick={() => void loadFullDemoCase(demoCase.id)}
+                                className={`text-left p-4 rounded-lg border-2 transition-all duration-200
+                                  ${isActive
+                                    ? 'border-primary bg-white shadow-sm'
+                                    : 'border-outline-variant/30 bg-white/80 hover:border-primary/40 hover:bg-white'
+                                  }
+                                  ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
+                              >
+                                <p className="font-bold text-sm text-on-surface">{demoCase.label}</p>
+                                <p className="text-xs text-on-surface-variant mt-1">{demoCase.subtitle}</p>
+                                {isLoading && (
+                                  <p className="text-xs text-primary font-semibold mt-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                                    Loading…
+                                  </p>
+                                )}
+                                {isActive && !isLoading && (
+                                  <p className="text-xs text-emerald-600 font-semibold mt-2">Active set</p>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {demoError && (
+                          <p className="text-xs text-red-600 font-medium">{demoError}</p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {DOC_KIND_ORDER.map(kind => {
@@ -432,23 +633,30 @@ export default function AnalyzeFlow() {
                             onKeyDown={e => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault()
-                                getInputRef(kind).current?.click()
+                                void handleUploadCardClick(kind)
                               }
                             }}
-                            onDragOver={e => { e.preventDefault(); setDraggingKind(kind) }}
+                            onDragOver={e => {
+                              if (demoMode) return
+                              e.preventDefault()
+                              setDraggingKind(kind)
+                            }}
                             onDragLeave={() => setDraggingKind(null)}
                             onDrop={e => {
+                              if (demoMode) return
                               e.preventDefault()
                               setDraggingKind(null)
                               addFileForKind(kind, e.dataTransfer.files)
                             }}
-                            onClick={() => getInputRef(kind).current?.click()}
+                            onClick={() => void handleUploadCardClick(kind)}
                             className={`relative flex flex-col rounded-xl border-2 cursor-pointer transition-all duration-200 overflow-hidden
                               ${isUploaded
                                 ? 'bg-emerald-50 border-emerald-400 shadow-sm'
                                 : isDraggingOver
                                   ? 'bg-blue-50 border-primary border-solid scale-[1.02] shadow-md'
-                                  : 'bg-surface-container-lowest border-outline-variant/40 border-dashed hover:border-primary/60 hover:bg-primary/5'
+                                  : demoMode
+                                    ? 'bg-surface-container-lowest border-primary/30 border-dashed hover:border-primary hover:bg-primary/5'
+                                    : 'bg-surface-container-lowest border-outline-variant/40 border-dashed hover:border-primary/60 hover:bg-primary/5'
                               }`}
                           >
                             <input
@@ -485,7 +693,7 @@ export default function AnalyzeFlow() {
                                 </div>
                                 <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-auto">
                                   <span className="material-symbols-outlined text-sm">edit</span>
-                                  Click to replace
+                                  {demoMode ? 'Click to reload demo file' : 'Click to replace'}
                                 </p>
                               </div>
                             ) : (
@@ -501,8 +709,16 @@ export default function AnalyzeFlow() {
                                   <p className="text-xs text-on-surface-variant leading-relaxed">{config.desc}</p>
                                 </div>
                                 <div className="mt-auto text-xs font-semibold text-primary flex items-center gap-1 pt-2">
-                                  <span className="material-symbols-outlined text-sm">upload</span>
-                                  {isDraggingOver ? 'Drop here' : 'Click or drag to upload'}
+                                  <span className="material-symbols-outlined text-sm">
+                                    {demoLoading === kind ? 'progress_activity' : demoMode ? 'play_circle' : 'upload'}
+                                  </span>
+                                  {demoLoading === kind
+                                    ? 'Loading demo…'
+                                    : isDraggingOver
+                                      ? 'Drop here'
+                                      : demoMode
+                                        ? 'Click to load demo file'
+                                        : 'Click or drag to upload'}
                                 </div>
                               </div>
                             )}
