@@ -11,6 +11,8 @@ from __future__ import annotations
 import httpx
 from pydantic import BaseModel
 
+from tools.code_cache import get_cached, set_cached
+
 # NLM Clinical Tables API — free, no auth, returns ICD-10-CM descriptions
 _NLM_ICD10_URL = "https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search"
 _TIMEOUT = 10.0
@@ -34,6 +36,10 @@ async def lookup_icd10(code: str) -> ICD10Result:
     """
     code = code.strip().upper()
 
+    cached = await get_cached("icd10", code)
+    if cached is not None:
+        return ICD10Result(**cached)
+
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.get(
@@ -51,17 +57,21 @@ async def lookup_icd10(code: str) -> ICD10Result:
                 # Find exact match first, then closest match
                 for entry in details:
                     if entry[0].upper().replace(".", "") == code.replace(".", ""):
-                        return ICD10Result(
+                        r = ICD10Result(
                             code=entry[0],
                             description=entry[1],
                             source_url=f"https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search?sf=code&terms={code}",
                         )
+                        await set_cached("icd10", code, r.model_dump())
+                        return r
                 # Return first result if no exact match
-                return ICD10Result(
+                r = ICD10Result(
                     code=details[0][0],
                     description=details[0][1],
                     source_url=f"https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search?sf=code&terms={code}",
                 )
+                await set_cached("icd10", code, r.model_dump())
+                return r
 
     except (httpx.HTTPError, IndexError, KeyError):
         pass

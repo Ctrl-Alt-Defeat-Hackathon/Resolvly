@@ -15,6 +15,8 @@ import re
 import httpx
 from pydantic import BaseModel
 
+from tools.code_cache import get_cached, set_cached
+
 _NLM_HCPCS_URL = "https://clinicaltables.nlm.nih.gov/api/hcpcs/v3/search"
 _TIMEOUT = 10.0
 
@@ -110,10 +112,16 @@ async def lookup_cpt_hcpcs(code: str) -> HCPCSResult:
             found=False,
         )
 
+    cache_ns = "cpt" if code_type == "cpt" else "hcpcs"
+    cached = await get_cached(cache_ns, code)
+    if cached is not None:
+        return HCPCSResult(**cached)
+
     # NLM table is HCPCS Level II only — CPT is AMA-licensed and not in this API
     if code_type == "cpt":
         web_hit = await _cpt_description_via_web(code)
         if web_hit:
+            await set_cached("cpt", code, web_hit.model_dump())
             return web_hit
         return HCPCSResult(
             code=code,
@@ -144,20 +152,24 @@ async def lookup_cpt_hcpcs(code: str) -> HCPCSResult:
                     entry_code = entry[0] if entry else ""
                     entry_desc = entry[1] if len(entry) > 1 else ""
                     if entry_code.upper() == code:
-                        return HCPCSResult(
+                        r = HCPCSResult(
                             code=entry_code,
                             description=entry_desc or f"HCPCS code {code}",
                             code_type="hcpcs",
                             source_url=f"https://clinicaltables.nlm.nih.gov/api/hcpcs/v3/search?terms={code}",
                         )
+                        await set_cached("hcpcs", code, r.model_dump())
+                        return r
 
                 first = details[0]
-                return HCPCSResult(
+                r = HCPCSResult(
                     code=first[0] if first else code,
                     description=first[1] if len(first) > 1 and first[1] else f"HCPCS code {code}",
                     code_type="hcpcs",
                     source_url=f"https://clinicaltables.nlm.nih.gov/api/hcpcs/v3/search?terms={code}",
                 )
+                await set_cached("hcpcs", code, r.model_dump())
+                return r
 
     except (httpx.HTTPError, IndexError, KeyError):
         pass

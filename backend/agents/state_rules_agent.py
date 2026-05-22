@@ -99,10 +99,36 @@ async def run_state_rules_agent(claim: ClaimObject) -> StateRulesEnrichment:
         enrichment.external_review_url = idoi_result.external_review_url
         enrichment.consumer_resources = idoi_result.consumer_resources
 
+        # Populate state_deadlines with actual deadline values based on regulation type
+        if regulation_type == RegulationType.medicaid:
+            enrichment.state_deadlines = {
+                "internal_appeal_days": "90",
+                "external_review_days": "N/A — Medicaid uses fair hearing process",
+                "expedited_hours": "72 business hours for urgent cases",
+                "regulation_basis": "42 CFR § 431.220",
+                "note": "Medicaid fair hearing deadline. Verify with your state Medicaid agency.",
+            }
+        elif regulation_type == RegulationType.erisa:
+            enrichment.state_deadlines = {
+                "internal_appeal_days": "180",
+                "external_review_days": "Civil action under ERISA § 502(a) after exhaustion",
+                "expedited_hours": "72 hours for urgent/concurrent care",
+                "regulation_basis": "29 CFR § 2560.503-1",
+                "note": "ERISA self-funded plan — state DOI does not regulate this plan.",
+            }
+        else:
+            # ACA / state-regulated (fully insured, marketplace, individual)
+            enrichment.state_deadlines = {
+                "internal_appeal_days": "180",
+                "external_review_days": "122",
+                "expedited_hours": "72",
+                "regulation_basis": "ACA § 2719 / 45 CFR § 147.136",
+                "note": "External review clock starts from internal appeal denial, not original denial.",
+            }
+
         # Only include state-specific appeal rules if plan is state-regulated
         if regulation_type != RegulationType.erisa:
             enrichment.appeal_rules = idoi_result.appeal_rules
-            enrichment.state_deadlines = idoi_result.state_deadlines
         else:
             # For ERISA: DOI is not the regulator, but state AG may help
             enrichment.appeal_rules = [

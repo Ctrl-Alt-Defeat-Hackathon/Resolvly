@@ -105,11 +105,8 @@ async def search_idoi(state: str = "IN", query: str = "") -> IDOIResult:
 
     result.consumer_resources = _official_consumer_links(doi_contact)
 
-    # State-specific deadlines: avoid inventing IC citations — point to DOI + live snippets
-    result.state_deadlines = {
-        "note": "Confirm deadlines on your denial notice and your state DOI consumer site; "
-        "federal ACA/ERISA timelines depend on plan type.",
-    }
+    # state_deadlines is populated by the State Rules Agent (which knows regulation type)
+    # Leave it empty here; the agent fills it with regulation-appropriate values.
 
     if state == "IN":
         result.appeal_rules = await _appeal_rules_from_web(state, result.doi_name or "Indiana Department of Insurance")

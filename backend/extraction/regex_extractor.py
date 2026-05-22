@@ -10,6 +10,76 @@ import re
 from datetime import date
 from typing import Any
 
+
+# ---------------------------------------------------------------------------
+# NPI Luhn validation
+# ---------------------------------------------------------------------------
+
+def _is_valid_npi(npi: str) -> bool:
+    """
+    Validate a 10-digit NPI using the CMS Luhn-variant algorithm.
+    Prepend '80840' to the first 9 digits, apply standard Luhn, compare check digit.
+    """
+    if len(npi) != 10 or not npi.isdigit():
+        return False
+    payload = "80840" + npi[:9]
+    check_digit = int(npi[9])
+    total = 0
+    for i, ch in enumerate(reversed(payload)):
+        n = int(ch)
+        if i % 2 == 0:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return (total + check_digit) % 10 == 0
+
+
+# ---------------------------------------------------------------------------
+# CPT modifier allowlist — any 2-char token NOT in this set is discarded
+# ---------------------------------------------------------------------------
+
+_VALID_CPT_MODIFIERS: frozenset[str] = frozenset({
+    "21", "22", "23", "24", "25", "26", "27", "32", "33",
+    "47", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
+    "62", "63", "66", "76", "77", "78", "79",
+    "80", "81", "82", "90", "91", "92", "95", "96", "97", "99",
+    "AA", "AD", "AH", "AI", "AJ", "AM", "AO", "AP", "AQ", "AR", "AS", "AT",
+    "AU", "AV", "AW", "AX", "AY", "AZ",
+    "BA", "BL", "BO", "BP", "BR", "BS", "BT",
+    "CA", "CB", "CC", "CD", "CE", "CF", "CG", "CH", "CI", "CJ", "CK",
+    "CM", "CN", "CO", "CP", "CQ", "CR", "CS", "CT",
+    "DA", "E1", "E2", "E3", "E4", "EA", "EB", "EC", "ED", "EE",
+    "EJ", "EM", "EP", "ER", "ET", "EX", "EY",
+    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "FA", "FP",
+    "G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9",
+    "GA", "GB", "GC", "GD", "GE", "GF", "GG", "GH", "GJ", "GK",
+    "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GV",
+    "GW", "GX", "GY", "GZ",
+    "HA", "HB", "HC", "HD", "HE", "HF", "HG", "HH", "HI", "HJ",
+    "HK", "HL", "HM", "HN", "HO", "HP", "HQ", "HR", "HS", "HT",
+    "HU", "HV", "HW", "HX", "HY", "HZ",
+    "J1", "J2", "J3", "J4", "JA", "JB", "JW",
+    "K0", "K1", "K2", "K3", "K4", "KA", "KB", "KC", "KD", "KE",
+    "KF", "KG", "KH", "KI", "KJ", "KX",
+    "L1", "LC", "LD", "LE", "LF", "LT",
+    "M2", "MA", "MB", "MC", "MD", "ME", "MF", "MG", "MH", "MS",
+    "N1", "NR",
+    "P1", "P2", "P3", "P4", "P5", "P6", "P9", "PA", "PB", "PC",
+    "Q0", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "QA", "QB",
+    "QC", "QD", "QE", "QF", "QG", "QH", "QI", "QJ", "QK", "QM",
+    "QN", "QP", "QQ", "QR", "QS", "QT", "QU", "QV", "QW", "QX", "QY", "QZ",
+    "RA", "RB", "RC", "RD", "RE", "RR", "RS", "RT",
+    "SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH", "SI", "SJ",
+    "SK", "SL", "SM", "SN", "SQ", "SS", "ST", "SU", "SV", "SW",
+    "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9",
+    "TA", "TB", "TC", "TD", "TE", "TF", "TG", "TH", "TJ", "TK",
+    "TL", "TM", "TN", "TP", "TQ", "TR", "TS", "TT",
+    "U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8", "U9",
+    "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH",
+    "VP", "XE", "XP", "XS", "XU",
+})
+
 from extraction.schema import (
     AppealRightsEntities,
     ClaimIdentification,
@@ -29,14 +99,14 @@ _PATTERNS: dict[str, str] = {
     "icd10": r"\b([A-Z][0-9]{2}\.?[0-9A-Z]{0,4})\b",
     "cpt": r"\b([0-9]{4}[0-9A-Z]|[0-9]{5})\b",                          # 5-char CPT
     "hcpcs": r"\b([A-Z][0-9]{4})\b",
-    "modifier": r"\b([A-Z]{2}|[0-9]{2}|[A-Z][0-9]|[0-9][A-Z])\b",      # 2-char modifiers
+    "modifier": r"\b([A-Z]{2}|[0-9]{2}|[A-Z][0-9]|[0-9][A-Z])\b",      # pre-filtered via _VALID_CPT_MODIFIERS allowlist below
 
     # Claim & plan identifiers
     "claim_number": r"(?:claim\s*(?:reference\s*)?(?:#|no\.?|number)[:\s]*)([\w\-]{6,20})",
     "member_id": r"(?:member\s*(?:id|#|no\.?)[:\s]*)([\w\-]{6,20})",
     "group_number": r"(?:group\s*(?:#|no\.?|number)[:\s]*)([\w\-]{4,15})",
     "plan_number": r"(?:policy\s*(?:#|no\.?|number)[:\s]*)([\w\-]{4,20})",
-    "npi": r"\b([0-9]{10})\b",                                            # NPI is exactly 10 digits
+    "npi": r"\b([0-9]{10})\b",                                            # validated via Luhn checksum below
     "prior_auth": r"(?:auth(?:orization)?\s*(?:#|no\.?|number)[:\s]*)([\w\-]{4,20})",
 
     # Denial codes
@@ -255,14 +325,20 @@ def _extract_icd10(text: str) -> list[str]:
     return list(dict.fromkeys(c.upper() for c in candidates if _ICD10_RE.match(c.upper())))
 
 
+_PROC_LINE_RE = re.compile(
+    r"(?:procedure|proc|service|svc)\b[^\n]*?\b([0-9]{5})\b[^\n]*?\$",
+    re.IGNORECASE,
+)
+
+
 def _extract_cpt(text: str) -> list[str]:
     """Extract CPT codes using context-aware matching to reduce false positives.
 
     Strategy:
-    1. Extract codes that appear after an explicit CPT label (e.g. "CPT Code: 47562",
-       "CPT: 47562", "procedure code 47562").
-    2. Fall back to bare 5-char codes only if they look like category II/III (contain
-       a letter, e.g. "47562T") — all-numeric codes are too ambiguous without context.
+    1. Explicit CPT label (highest confidence).
+    2. Category II/III alpha-suffix codes (unambiguous).
+    3. Bare 5-digit codes that appear in a procedure/service context line containing
+       a dollar amount (positional heuristic for table rows in EOBs).
     """
     found: list[str] = []
 
@@ -280,6 +356,14 @@ def _extract_cpt(text: str) -> list[str]:
     for m in re.finditer(r"\b([0-9]{4}[A-Z])\b", text):
         code = m.group(1).upper()
         if _CPT_RE.match(code) and code not in found:
+            found.append(code)
+
+    # Pattern 3: bare 5-digit codes in procedure/service table rows with a dollar amount
+    # Requires "procedure|proc|service|svc" AND "$" on the same line to reduce false positives
+    for m in _PROC_LINE_RE.finditer(text):
+        code = m.group(1)
+        n = int(code)
+        if 100 <= n <= 99999 and code not in found:
             found.append(code)
 
     return list(dict.fromkeys(found))
@@ -386,15 +470,23 @@ def extract_pass1(text: str) -> dict[str, Any]:
         "date_of_denial": denial_date_str,
         "date_of_service": service_date_str,
 
-        # Patient / provider
-        "treating_provider_npi": _first_match(_PATTERNS["npi"], text),
+        # Patient / provider — NPI validated via Luhn checksum to reject phone numbers
+        "treating_provider_npi": next(
+            (m.group(1) for m in re.finditer(_PATTERNS["npi"], text) if _is_valid_npi(m.group(1))),
+            None,
+        ),
         "patient_member_id": _first_match(_PATTERNS["member_id"], text),
 
         # Billing codes
         "icd10_diagnosis_codes": _extract_icd10(text),
         "cpt_procedure_codes": _extract_cpt(text),
         "hcpcs_codes": _extract_hcpcs(text),
-        "modifier_codes": _all_matches(_PATTERNS["modifier"], text),
+        # Modifier codes filtered through allowlist of ~150 valid CPT modifier values
+        "modifier_codes": [
+            m.upper()
+            for m in _all_matches(_PATTERNS["modifier"], text)
+            if m.upper() in _VALID_CPT_MODIFIERS
+        ],
         "place_of_service_code": _first_match(_PATTERNS["pos"], text),
 
         # Financial

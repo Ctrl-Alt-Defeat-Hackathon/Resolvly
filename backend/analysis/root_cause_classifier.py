@@ -37,12 +37,16 @@ class RootCauseResult(BaseModel):
 
 
 # CARC code → root cause mapping (deterministic rules)
+# Buckets are DISJOINT — each code belongs to exactly one bucket to prevent ties.
+# Removed from _CARC_NETWORK_COVERAGE: 27 (eligibility — "coverage terminated" = enrollment issue)
+# Removed from _CARC_CODING_BILLING:   29 (timely filing = procedural/administrative only)
+# Removed from _CARC_PROCEDURAL:       16 (claim submission error = coding/billing only)
 _CARC_MEDICAL_NECESSITY = {"50", "56", "58", "146", "167", "193"}
 _CARC_PRIOR_AUTH = {"15", "197", "246", "251"}
-_CARC_CODING_BILLING = {"4", "6", "9", "11", "16", "18", "22", "26", "29", "31", "97", "125", "131", "170", "176", "177", "178", "179", "180", "181", "182", "183", "184", "185", "186", "187", "188"}
-_CARC_NETWORK_COVERAGE = {"27", "109", "119", "151", "204"}
+_CARC_CODING_BILLING = {"4", "6", "9", "11", "16", "18", "22", "26", "31", "97", "125", "131", "170", "176", "177", "178", "179", "180", "181", "182", "183", "184", "185", "186", "187", "188"}
+_CARC_NETWORK_COVERAGE = {"109", "119", "151", "204"}
 _CARC_ELIGIBILITY = {"27", "96", "116", "133"}
-_CARC_PROCEDURAL = {"16", "29", "252", "253", "254"}
+_CARC_PROCEDURAL = {"29", "252", "253", "254"}
 
 # CARC → responsible party mapping
 _CARC_RESPONSIBLE_PARTY: dict[str, str] = {
@@ -67,8 +71,8 @@ _CARC_RESPONSIBLE_PARTY: dict[str, str] = {
     "109": "insurer",
     "119": "patient",
     "151": "patient",
-    # Network
-    "27": "provider_billing_office",
+    # Eligibility (coverage terminated = patient enrollment problem)
+    "27": "patient",
 }
 
 
@@ -91,7 +95,7 @@ def _classify_by_carc(carc_codes: list[str]) -> RootCauseResult | None:
         else:
             normalized.append(code.strip())
 
-    # Score each category
+    # Score each category (buckets are disjoint — each code scores exactly one bucket)
     scores: dict[str, int] = {
         "medical_necessity": 0,
         "prior_authorization": 0,
@@ -102,34 +106,56 @@ def _classify_by_carc(carc_codes: list[str]) -> RootCauseResult | None:
     }
 
     responsible_parties: list[str] = []
+    # Track which category the first code in the list belongs to (tie-breaker)
+    first_code_category: str | None = None
 
     for code in normalized:
+        cat = None
         if code in _CARC_PRIOR_AUTH:
             scores["prior_authorization"] += 3
-        if code in _CARC_MEDICAL_NECESSITY:
+            cat = "prior_authorization"
+        elif code in _CARC_MEDICAL_NECESSITY:
             scores["medical_necessity"] += 3
-        if code in _CARC_CODING_BILLING:
+            cat = "medical_necessity"
+        elif code in _CARC_CODING_BILLING:
             scores["coding_billing_error"] += 2
-        if code in _CARC_NETWORK_COVERAGE:
+            cat = "coding_billing_error"
+        elif code in _CARC_NETWORK_COVERAGE:
             scores["network_coverage"] += 2
-        if code in _CARC_ELIGIBILITY:
+            cat = "network_coverage"
+        elif code in _CARC_ELIGIBILITY:
             scores["eligibility_enrollment"] += 2
-        if code in _CARC_PROCEDURAL:
+            cat = "eligibility_enrollment"
+        elif code in _CARC_PROCEDURAL:
             scores["procedural_administrative"] += 1
+            cat = "procedural_administrative"
+
+        if cat and first_code_category is None:
+            first_code_category = cat
 
         party = _CARC_RESPONSIBLE_PARTY.get(code, "unknown")
         if party != "unknown":
             responsible_parties.append(party)
 
-    best_category = max(scores, key=lambda k: scores[k])
-    best_score = scores[best_category]
+    best_score = max(scores.values())
 
     if best_score == 0:
         return None
 
-    # Determine confidence: high if clear winner, lower if tied
-    second_best = sorted(scores.values(), reverse=True)[1]
-    if best_score > second_best + 1:
+    # Find all tied winners
+    winners = [cat for cat, score in scores.items() if score == best_score]
+    if len(winners) == 1:
+        best_category = winners[0]
+    elif first_code_category and first_code_category in winners:
+        # Tie-break: prefer the category of the first code in the document
+        # (denial letters list the primary reason first)
+        best_category = first_code_category
+    else:
+        # Fall through to LLM by returning low-confidence result
+        best_category = winners[0]
+
+    # Confidence: high if exactly one winner, lower if tied (tie-broken by first-code rule)
+    if len(winners) == 1:
         confidence = 0.90
         method = "rules"
     else:

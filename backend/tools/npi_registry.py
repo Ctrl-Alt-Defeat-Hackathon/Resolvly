@@ -11,6 +11,8 @@ from __future__ import annotations
 import httpx
 from pydantic import BaseModel
 
+from tools.code_cache import get_cached, set_cached
+
 _NPPES_URL = "https://npiregistry.cms.hhs.gov/api/"
 _TIMEOUT = 10.0
 
@@ -43,6 +45,10 @@ async def lookup_npi(npi: str) -> NPIResult:
             provider_name=f"Invalid NPI format: {npi} (must be exactly 10 digits)",
             found=False,
         )
+
+    cached = await get_cached("npi", npi)
+    if cached is not None:
+        return NPIResult(**cached)
 
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -112,7 +118,7 @@ async def lookup_npi(npi: str) -> NPIResult:
                 zip_code = practice_addr.get("postal_code", "")[:5]
                 phone = practice_addr.get("telephone_number", "")
 
-            return NPIResult(
+            r = NPIResult(
                 npi=npi,
                 provider_name=name.strip(),
                 provider_type=provider_type,
@@ -124,6 +130,8 @@ async def lookup_npi(npi: str) -> NPIResult:
                 phone=phone,
                 source_url=f"https://npiregistry.cms.hhs.gov/api/?version=2.1&number={npi}",
             )
+            await set_cached("npi", npi, r.model_dump())
+            return r
 
     except (httpx.HTTPError, KeyError, IndexError):
         pass

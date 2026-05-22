@@ -38,15 +38,30 @@ class AnalysisResult(BaseModel):
     ics_events: list[dict] = []
 
 
-async def run_analysis_agent(claim: ClaimObject) -> AnalysisResult:
+async def run_analysis_agent(
+    claim: ClaimObject,
+    root_cause_result: RootCauseResult | None = None,
+) -> AnalysisResult:
     """
     Run all analysis modules and return structured results.
+
+    Pass root_cause_result from the orchestrator's Stage 0 pre-classification to
+    avoid a second LLM call. If not provided, classifies from scratch.
     """
     logger.info("Analysis Agent: starting analysis pipeline")
 
-    # Step 1: Classify root cause (may call LLM)
-    root_cause_result: RootCauseResult = await classify_root_cause(claim)
-    logger.info(f"Root cause: {root_cause_result.category} ({root_cause_result.confidence:.2f})")
+    # Step 1: Re-use orchestrator's pre-classified root cause if available
+    if root_cause_result is not None:
+        logger.info(
+            f"Root cause: {root_cause_result.category} ({root_cause_result.confidence:.2f}) "
+            f"[reused from orchestrator]"
+        )
+    else:
+        root_cause_result = await classify_root_cause(claim)
+        logger.info(
+            f"Root cause: {root_cause_result.category} ({root_cause_result.confidence:.2f}) "
+            f"[classified by analysis agent]"
+        )
 
     # Update derived fields on claim so downstream modules have access
     claim.derived.root_cause_category = root_cause_result.category

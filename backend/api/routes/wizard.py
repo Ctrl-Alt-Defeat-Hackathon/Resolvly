@@ -210,14 +210,20 @@ async def plan_type_wizard(request: Request, body: WizardRequest) -> WizardRespo
         elif emp_type == EmployerPlanType.fully_insured:
             return await _merge_dynamic_laws(_build_state_response(state), "state_aca")
         else:
-            resp = _build_erisa_response(state)
-            resp = await _merge_dynamic_laws(resp, "erisa")
+            # Default to fully-insured (state-regulated): ~60% of employer plans are fully
+            # insured. ERISA self-funded is the minority; defaulting to ERISA was causing
+            # wrong deadlines, wrong regulator, and wrong routing cards for most users.
+            resp = _build_state_response(state)
+            resp = await _merge_dynamic_laws(resp, "state_aca")
             resp.applicable_laws = list(resp.applicable_laws) + [
                 {
-                    "law": "Plan type uncertain",
+                    "law": "Plan type assumed — fully insured (state-regulated)",
                     "section": "Verify SPD / plan documents",
-                    "relevance": "Employer plan type affects whether ERISA or state DOI rules apply. "
-                    "Confirm with your plan administrator.",
+                    "relevance": "We assumed your employer plan is fully insured (state DOI "
+                    "regulates it) because most employer plans are. If your plan is ERISA "
+                    "self-funded (large employer, 1,000+ employees), contact your HR department "
+                    "and re-run this wizard selecting 'ERISA self-funded'. ERISA plans have "
+                    "different appeal rules — DOL EBSA, no external review.",
                     "url": "https://www.dol.gov/agencies/ebsa",
                     "source": "U.S. Department of Labor (EBSA)",
                 }

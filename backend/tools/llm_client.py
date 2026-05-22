@@ -42,15 +42,20 @@ def _is_local_environment() -> bool:
     return settings.debug or settings.ollama_enabled
 
 
-_llm_semaphore: asyncio.Semaphore | None = None
-_semaphore_lock = asyncio.Lock()
-
 _openai_rate_limited = False
 _openai_rate_limit_lock = asyncio.Lock()
 _openai_rate_limit_reset_task: asyncio.Task | None = None
 
 _last_request_time: float = 0.0
 _last_request_lock = asyncio.Lock()
+
+# Priority queue-based dispatch — replaces the Semaphore + sleep approach.
+# Workers dequeue by (priority, seq) so lower priority numbers run first.
+# _request_seq breaks FIFO ties within the same priority level.
+_llm_request_queue: asyncio.PriorityQueue | None = None
+_llm_worker_tasks: list[asyncio.Task] = []
+_worker_init_lock = asyncio.Lock()
+_request_seq: int = 0
 
 
 async def _reset_openai_rate_limit_after_delay(delay_seconds: float = 120.0):
@@ -61,13 +66,86 @@ async def _reset_openai_rate_limit_after_delay(delay_seconds: float = 120.0):
         logger.info("OpenAI rate limit cooldown complete — re-enabling OpenAI API")
 
 
-async def _get_semaphore() -> asyncio.Semaphore:
-    global _llm_semaphore
-    async with _semaphore_lock:
-        if _llm_semaphore is None:
+async def _execute_llm_call(prompt: str, expect_json: bool, system_instruction: str | None) -> str:
+    """
+    Execute a single LLM call with rate limiting and fallback.
+    Called exclusively by _llm_worker_loop — never directly.
+    """
+    global _last_request_time, _openai_rate_limited
+
+    async with _last_request_lock:
+        now = time.time()
+        time_since_last = now - _last_request_time
+        settings = get_settings()
+        min_delay = settings.llm_min_delay_between_requests
+        if time_since_last < min_delay:
+            wait_time = min_delay - time_since_last
+            logger.debug(f"Rate limit: waiting {wait_time:.1f}s before next request")
+            await asyncio.sleep(wait_time)
+        _last_request_time = time.time()
+
+    settings = get_settings()
+    skip_retries = _is_local_environment() and settings.ollama_enabled
+
+    should_skip_openai = False
+    async with _openai_rate_limit_lock:
+        should_skip_openai = _openai_rate_limited
+
+    if settings.openai_api_key and not should_skip_openai:
+        response, should_fallback = await _complete_openai(
+            prompt, expect_json, system_instruction, 0, skip_retries
+        )
+        if response:
+            return response
+        if _is_local_environment() and settings.ollama_enabled:
+            logger.info("OpenAI failed, falling back to Ollama (local)")
+            return await _complete_ollama(prompt, expect_json, system_instruction)
+        return response
+
+    if should_skip_openai:
+        logger.info("OpenAI currently rate-limited")
+
+    if _is_local_environment() and settings.ollama_enabled:
+        logger.info("Using Ollama (local)")
+        return await _complete_ollama(prompt, expect_json, system_instruction)
+
+    logger.warning(
+        "No LLM API key configured — set OPENAI_API_KEY, or enable Ollama for local development"
+    )
+    return ""
+
+
+async def _llm_worker_loop():
+    """Single worker that dequeues and processes LLM requests in priority order."""
+    while True:
+        item = await _llm_request_queue.get()
+        _priority, _seq, prompt, expect_json, system_instruction, future = item
+        try:
+            result = await _execute_llm_call(prompt, expect_json, system_instruction)
+            if not future.done():
+                future.set_result(result)
+        except Exception as e:
+            if not future.done():
+                future.set_exception(e)
+        finally:
+            _llm_request_queue.task_done()
+
+
+async def _ensure_workers():
+    """Lazily initialize the priority queue and worker pool (called from async context)."""
+    global _llm_request_queue, _llm_worker_tasks
+    async with _worker_init_lock:
+        if _llm_request_queue is None:
             settings = get_settings()
-            _llm_semaphore = asyncio.Semaphore(settings.llm_max_concurrent_requests)
-        return _llm_semaphore
+            _llm_request_queue = asyncio.PriorityQueue()
+            _llm_worker_tasks = [
+                asyncio.create_task(_llm_worker_loop())
+                for _ in range(settings.llm_max_concurrent_requests)
+            ]
+            logger.info(
+                f"LLM worker pool started: {settings.llm_max_concurrent_requests} workers, "
+                "priority queue active"
+            )
 
 
 def _strip_json_fences(text: str) -> str:
@@ -262,64 +340,32 @@ async def complete_llm(
     priority: int = 5,
 ) -> str:
     """
-    Run a completion with rate limiting and automatic fallback.
+    Enqueue an LLM completion request and await the result.
 
-    Fallback order:
-    1. OpenAI (if OPENAI_API_KEY is set and not rate-limited)
-    2. Ollama (if OLLAMA_ENABLED=true and running locally in dev mode)
+    Requests are processed by a worker pool in priority order:
+      priority=1 (highest) → extraction, root cause classification
+      priority=8 (lowest)  → appeal letter generation
+
+    Workers execute requests in (priority, arrival_order) order, so a
+    priority=1 request always runs before a queued priority=8 request,
+    regardless of arrival time.
+
+    Fallback order per worker:
+      1. OpenAI (if OPENAI_API_KEY is set and not rate-limited)
+      2. Ollama (if OLLAMA_ENABLED=true and running locally)
     """
-    global _openai_rate_limited
+    global _request_seq
 
-    settings = get_settings()
-    semaphore = await _get_semaphore()
+    await _ensure_workers()
 
-    async with semaphore:
-        global _last_request_time
-        async with _last_request_lock:
-            now = time.time()
-            time_since_last = now - _last_request_time
-            min_delay = settings.llm_min_delay_between_requests
-            if time_since_last < min_delay:
-                wait_time = min_delay - time_since_last
-                logger.debug(f"Rate limit: waiting {wait_time:.1f}s before next request")
-                await asyncio.sleep(wait_time)
-            _last_request_time = time.time()
+    loop = asyncio.get_event_loop()
+    future: asyncio.Future[str] = loop.create_future()
+    _request_seq += 1
+    seq = _request_seq
 
-        # Stagger only when strictly serial (concurrency=1); otherwise parallel calls should not wait.
-        if settings.llm_max_concurrent_requests <= 1 and priority > 1:
-            await asyncio.sleep(0.5 * (priority - 1))
-
-        skip_retries = _is_local_environment() and settings.ollama_enabled
-
-        should_skip_openai = False
-        async with _openai_rate_limit_lock:
-            should_skip_openai = _openai_rate_limited
-
-        if settings.openai_api_key and not should_skip_openai:
-            logger.debug(f"Attempting OpenAI completion (priority={priority})")
-            response, should_fallback = await _complete_openai(
-                prompt, expect_json, system_instruction, 0, skip_retries
-            )
-            if response:
-                return response
-
-            if _is_local_environment() and settings.ollama_enabled:
-                logger.info("OpenAI failed, falling back to Ollama (local)")
-                return await _complete_ollama(prompt, expect_json, system_instruction)
-
-            return response
-
-        if should_skip_openai:
-            logger.info("OpenAI currently rate-limited")
-
-        if _is_local_environment() and settings.ollama_enabled:
-            logger.info("Using Ollama (local)")
-            return await _complete_ollama(prompt, expect_json, system_instruction)
-
-        logger.warning(
-            "No LLM API key configured — set OPENAI_API_KEY, or enable Ollama for local development"
-        )
-        return ""
+    logger.debug(f"LLM request enqueued (priority={priority}, seq={seq})")
+    await _llm_request_queue.put((priority, seq, prompt, expect_json, system_instruction, future))
+    return await future
 
 
 async def reset_openai_rate_limit():

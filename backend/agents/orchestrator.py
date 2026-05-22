@@ -165,8 +165,8 @@ async def run_orchestrator(
 
     logger.info("Orchestrator: parallel agents complete — running Analysis Agent")
 
-    # Stage 2: Run Analysis Agent (sequential — needs enrichment data)
-    analysis_result: AnalysisResult = await run_analysis_agent(claim)
+    # Stage 2: Run Analysis Agent — pass root_cause_pre to avoid a second classification call
+    analysis_result: AnalysisResult = await run_analysis_agent(claim, root_cause_result=root_cause_pre)
 
     logger.info("Orchestrator: Analysis Agent complete — assembling response")
 
@@ -252,8 +252,8 @@ async def stream_orchestrator(
         },
     )
 
-    # Analysis (sequential)
-    analysis_result: AnalysisResult = await run_analysis_agent(claim)
+    # Analysis (sequential) — reuse root_cause_pre to skip second classification
+    analysis_result: AnalysisResult = await run_analysis_agent(claim, root_cause_result=root_cause_pre)
     yield OrchestratorProgress(
         event="analysis_complete",
         data={
