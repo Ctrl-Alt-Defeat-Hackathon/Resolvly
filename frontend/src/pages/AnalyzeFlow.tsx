@@ -153,6 +153,87 @@ function ProcessingView({
   )
 }
 
+const DEMO_OFFER_DELAY_MS = 2000
+const DEMO_OFFER_EXIT_MS = 320
+
+function DemoOfferModal({
+  open,
+  onAccept,
+  onDecline,
+}: {
+  open: boolean
+  onAccept: () => void
+  onDecline: () => void
+}) {
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const frame = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true))
+      })
+      return () => cancelAnimationFrame(frame)
+    }
+    setVisible(false)
+    const timer = window.setTimeout(() => setMounted(false), DEMO_OFFER_EXIT_MS)
+    return () => window.clearTimeout(timer)
+  }, [open])
+
+  useEffect(() => {
+    if (!mounted) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [mounted])
+
+  if (!mounted) return null
+
+  return (
+    <div
+      className={`demo-offer-backdrop ${visible ? 'demo-offer-backdrop--visible' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="demo-offer-title"
+    >
+      <div className="demo-offer-panel">
+        <div className="demo-offer-icon w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-5">
+          <span className="material-symbols-outlined text-primary text-2xl">science</span>
+        </div>
+        <div className="demo-offer-content">
+          <h2 id="demo-offer-title" className="text-2xl font-extrabold font-headline text-primary mb-3">
+            Try Resolvly with demo documents?
+          </h2>
+          <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
+            You can explore a full analysis using sample denial letters, EOBs, and medical bills—no personal
+            documents needed. Choose demo mode to load files with one click on each upload card, or upload your own
+            files instead.
+          </p>
+        </div>
+        <div className="demo-offer-actions flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            onClick={onAccept}
+            className="signature-cta text-white flex-1 px-5 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-shadow duration-200"
+          >
+            Use demo documents
+          </button>
+          <button
+            type="button"
+            onClick={onDecline}
+            className="flex-1 px-5 py-3 rounded-xl font-bold text-sm border border-slate-200 text-on-surface hover:bg-slate-50 transition-colors duration-200"
+          >
+            Upload my own
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Single-page Upload & Context Wizard ────────────────────────────────────
 export default function AnalyzeFlow() {
   const navigate = useNavigate()
@@ -167,9 +248,9 @@ export default function AnalyzeFlow() {
   const [planType, setPlanType] = useState<string>('')
   const [funding, setFunding] = useState<string>('')
 
-  const [showDemoOffer, setShowDemoOffer] = useState(
-    () => sessionStorage.getItem(DEMO_OFFER_SESSION_KEY) !== '1',
-  )
+  const demoOfferEligible =
+    typeof sessionStorage !== 'undefined' && sessionStorage.getItem(DEMO_OFFER_SESSION_KEY) !== '1'
+  const [demoOfferOpen, setDemoOfferOpen] = useState(false)
   const [demoMode, setDemoMode] = useState(
     () => sessionStorage.getItem(DEMO_MODE_SESSION_KEY) === '1',
   )
@@ -196,6 +277,12 @@ export default function AnalyzeFlow() {
       navigate('/action-plan', { replace: true })
     }
   }, [navigate])
+
+  useEffect(() => {
+    if (!demoOfferEligible || phase !== 'wizard') return
+    const timer = window.setTimeout(() => setDemoOfferOpen(true), DEMO_OFFER_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [demoOfferEligible, phase])
 
   function applyFileForKind(kind: DocKind, file: File, displayName?: string) {
     const base = baseNameForKind(kind)
@@ -240,25 +327,40 @@ export default function AnalyzeFlow() {
     })
   }
 
+  function clearDocKindUploads() {
+    setFiles(prev => prev.filter(f => !DOC_KIND_ORDER.includes(f.docKind)))
+    for (const kind of DOC_KIND_ORDER) {
+      const input = getInputRef(kind).current
+      if (input) input.value = ''
+    }
+  }
+
+  function setDemoModeEnabled(enabled: boolean) {
+    sessionStorage.setItem(DEMO_MODE_SESSION_KEY, enabled ? '1' : '0')
+    if (!enabled) clearDocKindUploads()
+    setDemoMode(enabled)
+    setDemoError(null)
+  }
+
   function acceptDemoMode() {
     sessionStorage.setItem(DEMO_OFFER_SESSION_KEY, '1')
-    sessionStorage.setItem(DEMO_MODE_SESSION_KEY, '1')
-    setDemoMode(true)
-    setShowDemoOffer(false)
-    setDemoError(null)
+    setDemoModeEnabled(true)
+    setDemoOfferOpen(false)
   }
 
   function declineDemoMode() {
     sessionStorage.setItem(DEMO_OFFER_SESSION_KEY, '1')
-    sessionStorage.setItem(DEMO_MODE_SESSION_KEY, '0')
-    setDemoMode(false)
-    setShowDemoOffer(false)
+    setDemoModeEnabled(false)
+    setDemoOfferOpen(false)
   }
 
   function exitDemoMode() {
-    sessionStorage.setItem(DEMO_MODE_SESSION_KEY, '0')
-    setDemoMode(false)
-    setDemoError(null)
+    setDemoModeEnabled(false)
+  }
+
+  function toggleDemoMode() {
+    if (demoMode) exitDemoMode()
+    else setDemoModeEnabled(true)
   }
 
   async function loadDemoDocForKind(kind: DocKind) {
@@ -418,42 +520,12 @@ export default function AnalyzeFlow() {
       <Navbar />
       <main className="flex-grow w-full min-w-0 pt-24 pb-12">
         <div className="editorial-margin">
-          {showDemoOffer && phase === 'wizard' && (
-            <div
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="demo-offer-title"
-            >
-              <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 border border-slate-200">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <span className="material-symbols-outlined text-primary text-2xl">science</span>
-                </div>
-                <h2 id="demo-offer-title" className="text-2xl font-extrabold font-headline text-primary mb-3">
-                  Try Resolvly with demo documents?
-                </h2>
-                <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
-                  You can explore a full analysis using sample denial letters, EOBs, and medical bills—no personal documents needed.
-                  Choose demo mode to load files with one click on each upload card, or upload your own files instead.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void acceptDemoMode()}
-                    className="signature-cta text-white flex-1 px-5 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all"
-                  >
-                    Use demo documents
-                  </button>
-                  <button
-                    type="button"
-                    onClick={declineDemoMode}
-                    className="flex-1 px-5 py-3 rounded-xl font-bold text-sm border border-slate-200 text-on-surface hover:bg-slate-50 transition-colors"
-                  >
-                    Upload my own
-                  </button>
-                </div>
-              </div>
-            </div>
+          {phase === 'wizard' && (
+            <DemoOfferModal
+              open={demoOfferOpen}
+              onAccept={() => void acceptDemoMode()}
+              onDecline={declineDemoMode}
+            />
           )}
 
           {phase === 'processing' ? (
@@ -550,34 +622,50 @@ export default function AnalyzeFlow() {
 
                   <section className="lg:col-span-8 flex flex-col gap-6 min-w-0 w-full">
 
-                    <div className="space-y-2">
-                      <h2 className="text-xl font-bold font-headline text-primary">Upload Your Documents</h2>
-                      <p className="text-sm text-on-surface-variant">
-                        {demoMode
-                          ? 'Demo mode: click a document card to load that sample file, or pick a full demo case below.'
-                          : 'All three documents are required for a complete forensic analysis. Click each card to upload the corresponding file.'}
-                      </p>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="space-y-2 min-w-0">
+                        <h2 className="text-xl font-bold font-headline text-primary">Upload Your Documents</h2>
+                        <p className="text-sm text-on-surface-variant">
+                          {demoMode
+                            ? 'Demo mode: click a document card to load that sample file, or pick a full demo case below.'
+                            : 'All three documents are required for a complete forensic analysis. Click each card to upload the corresponding file.'}
+                        </p>
+                      </div>
+                      <div
+                        className="flex items-center gap-2.5 shrink-0 rounded-full border border-outline-variant/25 bg-surface-container-lowest/80 px-3 py-1.5"
+                        title={demoMode ? 'Turn off demo mode' : 'Use sample documents instead of uploading your own'}
+                      >
+                        <span className="material-symbols-outlined text-base text-primary/70">science</span>
+                        <span className="text-xs font-semibold text-on-surface-variant">Demo mode</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={demoMode}
+                          aria-label="Toggle demo mode"
+                          onClick={toggleDemoMode}
+                          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
+                            demoMode ? 'bg-primary' : 'bg-outline-variant/50'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                              demoMode ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
 
                     {demoMode && (
                       <div className="rounded-xl border border-primary/25 bg-primary/5 p-5 space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-primary flex items-center gap-2">
-                              <span className="material-symbols-outlined text-base">folder_special</span>
-                              Demo document sets
-                            </p>
-                            <p className="text-xs text-on-surface-variant mt-1">
-                              Load all three files at once, or click an individual card above for one document.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={exitDemoMode}
-                            className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 shrink-0 self-start"
-                          >
-                            Switch to my own uploads
-                          </button>
+                        <div>
+                          <p className="text-sm font-bold text-primary flex items-center gap-2">
+                            <span className="material-symbols-outlined text-base">folder_special</span>
+                            Demo document sets
+                          </p>
+                          <p className="text-xs text-on-surface-variant mt-1">
+                            Load all three files at once, or click an individual card above for one document.
+                          </p>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           {DEMO_CASES.map(demoCase => {
