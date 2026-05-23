@@ -19,7 +19,8 @@ from slowapi.util import get_remote_address
 from extraction.regex_extractor import extract_pass1
 from extraction.llm_extractor import extract_pass2
 from extraction.document_stitcher import stitch_documents, classify_document
-from extraction.schema import ClaimObject, ExtractionConfidence, PlanContext
+from extraction.schema import ClaimObject, ExtractionConfidence, FieldProvenance, PlanContext
+from extraction.confidence_scorer import compute_pass1_field_confidence, cross_validate_field
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -58,45 +59,64 @@ def _safe_parse_date(value: str | None) -> date | None:
 
 
 def _confidence_from_results(pass1: dict, pass2: dict) -> ExtractionConfidence:
-    """Compute confidence scores from both extraction passes."""
+    """
+    Compute per-field confidence scores from both extraction passes.
+
+    Uses LLM-reported per-field confidence (from Pass 2 _confidence keys) when
+    available; falls back to the 0.7/0.9/1.0 step function when not.
+
+    Weights for overall score: critical fields count 2×, others 1×.
+    """
     per_field: dict[str, float] = {}
-    total = 0.0
-    count = 0
 
-    # Key fields to score
-    key_fields = {
-        "claim_reference_number": ("claim_reference_number", None),
-        "plan_policy_number": ("plan_policy_number", None),
-        "patient_member_id": ("patient_member_id", None),
-        "patient_full_name": (None, "patient_full_name"),
-        "treating_provider_name": (None, "treating_provider_name"),
-        "icd10_diagnosis_codes": ("icd10_diagnosis_codes", None),
-        "cpt_procedure_codes": ("cpt_procedure_codes", None),
-        "carc_codes": ("carc_codes", None),
-        "denial_reason_narrative": (None, "denial_reason_narrative"),
-        "prior_auth_status": ("prior_auth_status", "prior_auth_status"),
-        "treating_provider_npi": ("treating_provider_npi", None),
-        "billed_amount": (None, "billed_amount"),
-    }
+    # (field_name, pass1_key, pass2_key, weight)
+    key_fields: list[tuple[str, str | None, str | None, int]] = [
+        ("date_of_denial",          "date_of_denial",           None,                      2),
+        ("carc_codes",              "carc_codes",               None,                      2),
+        ("denial_reason_narrative", None,                       "denial_reason_narrative",  2),
+        ("claim_reference_number",  "claim_reference_number",   None,                      1),
+        ("plan_policy_number",      "plan_policy_number",       None,                      1),
+        ("patient_member_id",       "patient_member_id",        None,                      1),
+        ("patient_full_name",       None,                       "patient_full_name",        1),
+        ("treating_provider_name",  None,                       "treating_provider_name",   1),
+        ("icd10_diagnosis_codes",   "icd10_diagnosis_codes",    None,                      1),
+        ("cpt_procedure_codes",     "cpt_procedure_codes",      None,                      1),
+        ("prior_auth_status",       "prior_auth_status",        "prior_auth_status",        1),
+        ("treating_provider_npi",   "treating_provider_npi",    None,                      1),
+        ("billed_amount",           None,                       "billed_amount",            1),
+    ]
 
-    for field_name, (p1_key, p2_key) in key_fields.items():
-        score = 0.0
+    weighted_total = 0.0
+    weight_sum = 0
+
+    for field_name, p1_key, p2_key, weight in key_fields:
         p1_val = pass1.get(p1_key) if p1_key else None
         p2_val = pass2.get(p2_key) if p2_key else None
+        llm_confidence = pass2.get(f"{p2_key}_confidence") if p2_key else None
 
-        if p1_val is not None and p1_val != "" and p1_val != []:
-            score = 0.7  # Regex found something
-        if p2_val is not None and p2_val != "" and p2_val != []:
-            score = max(score, 0.9)  # LLM found something — higher confidence
-        if score == 0.7 and p2_val is not None:
-            score = 1.0  # Both passes agree — highest confidence
+        score = 0.0
+        has_p1 = p1_val is not None and p1_val != "" and p1_val != []
+        has_p2 = p2_val is not None and p2_val != "" and p2_val != []
 
-        per_field[field_name] = score
-        total += score
-        count += 1
+        if has_p2 and isinstance(llm_confidence, (int, float)):
+            # Use LLM-reported confidence directly
+            score = float(llm_confidence)
+            if has_p1:
+                # Both passes found something — bonus when they can agree
+                score = min(1.0, score + 0.05)
+        elif has_p1 and has_p2:
+            score = 1.0   # both passes found something
+        elif has_p2:
+            score = 0.9   # LLM only
+        elif has_p1:
+            score = 0.7   # regex only
+
+        per_field[field_name] = round(score, 3)
+        weighted_total += score * weight
+        weight_sum += weight
 
     return ExtractionConfidence(
-        overall=round(total / count, 2) if count else 0.0,
+        overall=round(weighted_total / weight_sum, 2) if weight_sum else 0.0,
         per_field=per_field,
     )
 
@@ -177,6 +197,230 @@ def _apply_pass2_to_claim(claim: ClaimObject, pass2: dict) -> None:
         claim.appeal_rights.insurer_appeals_fax = pass2["insurer_appeals_fax"]
 
 
+def _populate_provenance_pass1(claim: ClaimObject, raw: dict, primary_doc_id: str | None) -> None:
+    """
+    Populate claim.provenance for key fields after Pass 1 regex extraction (§5.4).
+    Only sets provenance for fields that were actually extracted.
+    """
+    _REGEX_TRACKED: list[tuple[str, str | None]] = [
+        # (provenance_key, raw_key_or_None)
+        ("date_of_denial",           "date_of_denial"),
+        ("date_of_service",          "date_of_service"),
+        ("claim_reference_number",   "claim_reference_number"),
+        ("carc_codes",               "carc_codes"),
+        ("billed_amount",            None),   # from financial_labeled
+        ("allowed_amount",           None),
+        ("insurer_paid_amount",      None),
+        ("denied_amount",            None),
+        ("patient_responsibility_total", None),
+    ]
+    fl = raw.get("financial_labeled") or {}
+
+    for prov_key, raw_key in _REGEX_TRACKED:
+        if raw_key:
+            value = raw.get(raw_key)
+        else:
+            value = fl.get(prov_key)
+
+        if value is not None and value != [] and value != "":
+            conf = compute_pass1_field_confidence(prov_key, value, raw)
+            claim.provenance[prov_key] = FieldProvenance(
+                value=value,
+                source_doc_id=primary_doc_id,
+                extractor="regex",
+                confidence=conf,
+            )
+        else:
+            claim.provenance[prov_key] = FieldProvenance(
+                value=None,
+                source_doc_id=primary_doc_id,
+                extractor="missing",
+                confidence=0.0,
+            )
+
+
+def _update_provenance_llm(claim: ClaimObject, pass2: dict) -> None:
+    """
+    Upgrade provenance for fields that Pass 2 LLM extracted with higher confidence (§5.4).
+    Overwrites regex provenance when LLM confidence > existing confidence.
+    """
+    _LLM_TRACKED: list[str] = [
+        "date_of_denial",
+        "denial_reason_narrative",
+        "claim_reference_number",
+        "billed_amount",
+        "allowed_amount",
+        "insurer_paid_amount",
+        "denied_amount",
+        "patient_responsibility_total",
+    ]
+
+    for field in _LLM_TRACKED:
+        value = pass2.get(field)
+        llm_conf = pass2.get(f"{field}_confidence")
+        if value is None:
+            continue
+        confidence = float(llm_conf) if isinstance(llm_conf, (int, float)) else 0.85
+        existing = claim.provenance.get(field)
+        if existing is None or confidence > existing.confidence:
+            claim.provenance[field] = FieldProvenance(
+                value=value,
+                extractor="llm",
+                confidence=confidence,
+            )
+
+
+def _cross_validate_and_finalize_provenance(
+    claim: ClaimObject, raw: dict, pass2: dict
+) -> list[str]:
+    """
+    Cross-validate key fields between Pass 1 (raw) and Pass 2 (pass2) (§6).
+
+    When both passes found a value for the same field:
+      - If they agree  → update provenance confidence to 0.97 (cross-validated)
+      - If they disagree → set confidence to 0.50, store both in disputed_values
+
+    Returns a list of field names that have disagreements (for warnings).
+    """
+    # Fields that both passes can extract — eligible for cross-validation
+    _CV_FIELDS: list[tuple[str, str]] = [
+        # (provenance_key, pass2_key_in_llm_result)
+        ("date_of_denial",              "date_of_denial"),
+        ("claim_reference_number",      "claim_reference_number"),
+        ("billed_amount",               "billed_amount"),
+        ("allowed_amount",              "allowed_amount"),
+        ("insurer_paid_amount",         "insurer_paid_amount"),
+        ("denied_amount",               "denied_amount"),
+        ("patient_responsibility_total","patient_responsibility_total"),
+    ]
+
+    fl = raw.get("financial_labeled") or {}
+    disputed_fields: list[str] = []
+
+    for prov_key, p2_key in _CV_FIELDS:
+        # Get Pass 1 value (already in provenance from _populate_provenance_pass1)
+        p1_prov = claim.provenance.get(prov_key)
+        p1_val = p1_prov.value if p1_prov else None
+
+        # For financial fields, also check the raw labeled dict as source
+        if p1_val is None and prov_key in (
+            "billed_amount", "allowed_amount", "insurer_paid_amount",
+            "denied_amount", "patient_responsibility_total",
+        ):
+            p1_val = fl.get(prov_key)
+
+        # Raw date fields use the iso string form
+        if p1_val is None and prov_key == "date_of_denial":
+            p1_val = raw.get("date_of_denial")
+        if p1_val is None and prov_key == "claim_reference_number":
+            p1_val = raw.get("claim_reference_number")
+
+        p2_val = pass2.get(p2_key)
+
+        conf, agreed, disputed = cross_validate_field(prov_key, p1_val, p2_val)
+        if conf == 0.0:
+            continue   # only one pass found it — no cross-validation applicable
+
+        existing = claim.provenance.get(prov_key)
+        if agreed:
+            # Both passes agree — upgrade to cross-validated confidence
+            if existing:
+                existing.confidence = conf
+            else:
+                claim.provenance[prov_key] = FieldProvenance(
+                    value=p2_val,
+                    extractor="llm",
+                    confidence=conf,
+                )
+        else:
+            # Disagreement — flag the conflict
+            disputed_fields.append(prov_key)
+            if existing:
+                existing.confidence = 0.50
+                existing.disputed_values = disputed
+            else:
+                claim.provenance[prov_key] = FieldProvenance(
+                    value=p1_val,
+                    extractor="regex",
+                    confidence=0.50,
+                    disputed_values=disputed,
+                )
+
+    return disputed_fields
+
+
+def _confidence_from_results(
+    claim: ClaimObject, pass1: dict, pass2: dict
+) -> ExtractionConfidence:
+    """
+    Compute per-field confidence scores from provenance + both passes (§6).
+
+    Priority:
+      1. If field is in claim.provenance → use its confidence (feature-based, cross-validated)
+      2. LLM-reported confidence from pass2 `<field>_confidence` keys
+      3. Legacy 0.7/0.9/1.0 step-function fallback for fields not in provenance
+
+    Weighted overall: critical fields (`date_of_denial`, `carc_codes`,
+    `denial_reason_narrative`) count 2×; others count 1×.
+    """
+    per_field: dict[str, float] = {}
+
+    # (field_name, pass1_key, pass2_key, weight)
+    key_fields: list[tuple[str, str | None, str | None, int]] = [
+        ("date_of_denial",          "date_of_denial",           None,                      2),
+        ("carc_codes",              "carc_codes",               None,                      2),
+        ("denial_reason_narrative", None,                       "denial_reason_narrative",  2),
+        ("claim_reference_number",  "claim_reference_number",   None,                      1),
+        ("plan_policy_number",      "plan_policy_number",       None,                      1),
+        ("patient_member_id",       "patient_member_id",        None,                      1),
+        ("patient_full_name",       None,                       "patient_full_name",        1),
+        ("treating_provider_name",  None,                       "treating_provider_name",   1),
+        ("icd10_diagnosis_codes",   "icd10_diagnosis_codes",    None,                      1),
+        ("cpt_procedure_codes",     "cpt_procedure_codes",      None,                      1),
+        ("prior_auth_status",       "prior_auth_status",        "prior_auth_status",        1),
+        ("treating_provider_npi",   "treating_provider_npi",    None,                      1),
+        ("billed_amount",           None,                       "billed_amount",            1),
+    ]
+
+    weighted_total = 0.0
+    weight_sum = 0
+
+    for field_name, p1_key, p2_key, weight in key_fields:
+        # 1. Prefer provenance confidence (feature-based + cross-validated)
+        prov = claim.provenance.get(field_name)
+        if prov and prov.extractor != "missing" and prov.confidence > 0.0:
+            score = prov.confidence
+        else:
+            # 2. Legacy step-function fallback for fields not in provenance
+            p1_val = pass1.get(p1_key) if p1_key else None
+            p2_val = pass2.get(p2_key) if p2_key else None
+            llm_confidence = pass2.get(f"{p2_key}_confidence") if p2_key else None
+
+            has_p1 = p1_val is not None and p1_val != "" and p1_val != []
+            has_p2 = p2_val is not None and p2_val != "" and p2_val != []
+
+            score = 0.0
+            if has_p2 and isinstance(llm_confidence, (int, float)):
+                score = float(llm_confidence)
+                if has_p1:
+                    score = min(1.0, score + 0.05)
+            elif has_p1 and has_p2:
+                score = 1.0
+            elif has_p2:
+                score = 0.9
+            elif has_p1:
+                score = 0.7
+
+        per_field[field_name] = round(score, 3)
+        weighted_total += score * weight
+        weight_sum += weight
+
+    return ExtractionConfidence(
+        overall=round(weighted_total / weight_sum, 2) if weight_sum else 0.0,
+        per_field=per_field,
+    )
+
+
 @router.post("/extract", response_model=ExtractResponse, status_code=status.HTTP_200_OK)
 @limiter.limit("10/minute")
 async def extract_entities(request: Request, body: ExtractRequest) -> ExtractResponse:
@@ -231,6 +475,9 @@ async def extract_entities(request: Request, body: ExtractRequest) -> ExtractRes
         claim.identification.plan_type = body.plan_context.plan_type
         claim.identification.erisa_or_state_regulated = body.plan_context.regulation_type
         claim.identification.plan_jurisdiction = body.plan_context.state
+        claim.identification.regulation_type_source = (
+            body.plan_context.regulation_type_source or "user"
+        )
 
     # Patient / Provider
     claim.patient_provider.patient_member_id = raw.get("patient_member_id")
@@ -268,6 +515,7 @@ async def extract_entities(request: Request, body: ExtractRequest) -> ExtractRes
     # Denial reason
     claim.denial_reason.carc_codes = raw.get("carc_codes", [])
     claim.denial_reason.rarc_codes = raw.get("rarc_codes", [])
+    claim.denial_reason.carc_codes_with_group = raw.get("carc_code_groups", {})
     claim.denial_reason.prior_auth_status = raw.get("prior_auth_status")
     claim.denial_reason.prior_auth_number = raw.get("prior_auth_number")
 
@@ -276,12 +524,28 @@ async def extract_entities(request: Request, body: ExtractRequest) -> ExtractRes
     claim.appeal_rights.insurer_appeals_phone = raw.get("insurer_appeals_phone")
     claim.appeal_rights.state_commissioner_info_present = raw.get("state_commissioner_info_present")
 
+    # ── Provenance: Pass 1 ──
+    primary_doc_id = doc_texts[0]["doc_id"] if len(doc_texts) == 1 else None
+    _populate_provenance_pass1(claim, raw, primary_doc_id)
+
     # ── Pass 2: LLM extraction ──
     combined_text = "\n\n".join(d["text"] for d in doc_texts)
     pass2_results = await extract_pass2(combined_text, raw)
 
     if pass2_results:
         _apply_pass2_to_claim(claim, pass2_results)
+        _update_provenance_llm(claim, pass2_results)
+        # Cross-validate fields where both passes have values (§6)
+        disputed = _cross_validate_and_finalize_provenance(claim, raw, pass2_results)
+        if disputed:
+            for field in disputed:
+                prov = claim.provenance.get(field)
+                vals = prov.disputed_values if prov else []
+                warnings.append(
+                    f"Pass 1 and Pass 2 disagreed on '{field}' "
+                    f"(values: {vals[0]!r} vs {vals[1]!r}). "
+                    "Verify this field manually."
+                )
         logger.info(f"Pass 2 enriched {len(pass2_results)} fields")
     else:
         warnings.append(
@@ -301,7 +565,7 @@ async def extract_entities(request: Request, body: ExtractRequest) -> ExtractRes
     if not claim.denial_reason.denial_reason_narrative:
         warnings.append("Denial reason narrative not extracted — critical for analysis.")
 
-    confidence = _confidence_from_results(raw, pass2_results)
+    confidence = _confidence_from_results(claim, raw, pass2_results)
 
     return ExtractResponse(
         claim_object=claim,

@@ -5,7 +5,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from config import get_settings
-from api.routes import health, upload, extract, analyze, outputs, wizard, codes, export
+from api.routes import health, upload, extract, analyze, outputs, wizard, codes, export, ocr
 from api.routes.health import health_check
 
 settings = get_settings()
@@ -40,6 +40,7 @@ app.include_router(outputs.router, prefix="/api/v1/outputs", tags=["Outputs"])
 app.include_router(wizard.router, prefix="/api/v1/wizard", tags=["Wizard"])
 app.include_router(codes.router, prefix="/api/v1/codes", tags=["Codes"])
 app.include_router(export.router, prefix="/api/v1/export", tags=["Export"])
+app.include_router(ocr.router, prefix="/api/v1/documents", tags=["Documents"])
 
 
 @app.get("/")

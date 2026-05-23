@@ -91,6 +91,45 @@ from extraction.schema import (
 
 
 # ---------------------------------------------------------------------------
+# ICD-10-CM valid first-character ranges
+# All 26 letters A-Z are valid ICD-10-CM leading characters in the current
+# specification (U codes added for COVID/emergency use). We use an allowlist to
+# explicitly guard against future additions and document the intent.
+# Additionally we keep a small set of 3-char tokens that appear in EOB/denial
+# contexts but are NOT ICD-10 codes (RARC/CARC context strings).
+# ---------------------------------------------------------------------------
+
+_ICD10_VALID_FIRST_CHARS: frozenset[str] = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+# Tokens that match the ICD-10 regex structurally but appear as billing
+# administrative codes in EOBs — excluded to reduce false positives.
+_ICD10_KNOWN_EXCLUSIONS: frozenset[str] = frozenset({
+    # Common RARC codes that happen to be letter+digit+digit
+    "N19", "N20", "N30", "N95", "N96",
+    # CARC group identifiers sometimes printed as bare codes
+    "CO1", "PR1", "OA1",
+    # Revenue codes that look like ICD-10
+    "REV",
+})
+
+
+def _is_valid_icd10(code: str) -> bool:
+    """
+    Accept a candidate ICD-10-CM code if it passes structural and exclusion checks.
+    The validation loop (§5) will further discard codes not found in the NLM database.
+    """
+    if not code or len(code) < 3:
+        return False
+    if code[0] not in _ICD10_VALID_FIRST_CHARS:
+        return False
+    if not code[1].isdigit() or not code[2].isdigit():
+        return False
+    if code in _ICD10_KNOWN_EXCLUSIONS:
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Regex patterns
 # ---------------------------------------------------------------------------
 
@@ -112,7 +151,8 @@ _PATTERNS: dict[str, str] = {
     # Denial codes
     # CARC codes: explicit prefix ("CARC: 50", "adjustment reason code 50")
     # OR EOB group-prefix format ("CO-50", "PR-27", "OA-18")
-    "carc": r"(?:(?:CARC|carc|adjustment\s*reason\s*code)[:\s]*([0-9]{1,3}[A-Z]?)|(?:CO|PR|OA|PI|CR)-([0-9]{1,3}[A-Z]?))\b",
+    # Group 1 = code from explicit form; Group 2 = code from group-prefix form; Group 3 = the prefix (CO/PR/OA/…)
+    "carc": r"(?:(?:CARC|carc|adjustment\s*reason\s*code)[:\s]*([0-9]{1,3}[A-Z]?)|(CO|PR|OA|PI|CR)-([0-9]{1,3}[A-Z]?))\b",
     "rarc": r"\b(?:RARC|rarc|remark\s*code)[:\s]*([A-Z]{1,2}[0-9]{1,3}[A-Z]?)\b",
 
     # Financial amounts
@@ -129,9 +169,10 @@ _PATTERNS: dict[str, str] = {
     # Place of service (2-digit)
     "pos": r"(?:place\s*of\s*service|POS)[:\s]*([0-9]{2})\b",
 
-    # Labeled date fields (for denial date / date of service)
-    "date_of_denial_label": r"(?:date\s*of\s*(?:denial|notice|adverse|determination)|denial\s*date)[:\s]*(.{0,40})",
-    "date_of_service_label": r"(?:date\s*of\s*service|service\s*date)[:\s]*(.{0,40})",
+    # Labeled date fields (100-char window to handle verbose denial letter phrasing).
+    # e.g. "Date of Denial Determination Notice (the date of this letter): March 5, 2026"
+    "date_of_denial_label": r"(?:date\s*of\s*(?:denial|notice|adverse|determination)|denial\s*date)[:\s]*(.{0,100})",
+    "date_of_service_label": r"(?:date\s*of\s*service|service\s*date)[:\s]*(.{0,100})",
 }
 
 _MONTHS = {
@@ -322,7 +363,10 @@ def extract_labeled_financials(text: str) -> dict[str, float]:
 
 def _extract_icd10(text: str) -> list[str]:
     candidates = re.findall(_PATTERNS["icd10"], text)
-    return list(dict.fromkeys(c.upper() for c in candidates if _ICD10_RE.match(c.upper())))
+    return list(dict.fromkeys(
+        c.upper() for c in candidates
+        if _ICD10_RE.match(c.upper()) and _is_valid_icd10(c.upper())
+    ))
 
 
 _PROC_LINE_RE = re.compile(
@@ -387,15 +431,38 @@ def _all_matches(pattern: str, text: str, group: int = 1) -> list[str]:
 # Public extraction function
 # ---------------------------------------------------------------------------
 
-def _extract_carc(text: str) -> list[str]:
-    """Extract CARC codes from both explicit-prefix and EOB group-prefix formats."""
-    codes = []
+def _extract_carc(text: str) -> tuple[list[str], dict[str, str]]:
+    """
+    Extract CARC codes from both explicit-prefix and EOB group-prefix formats.
+
+    Returns:
+        codes: list of code numbers (e.g. ["50", "27"]) — backward-compatible
+        code_groups: dict mapping code → group prefix (e.g. {"50": "CO", "27": "PR"})
+                     CO = provider-side, PR = patient-side, OA = other adjustment
+                     "" = extracted from explicit form (CARC: 50) with no group context
+    """
+    codes: list[str] = []
+    code_groups: dict[str, str] = {}
+
     for m in re.finditer(_PATTERNS["carc"], text, re.IGNORECASE):
-        # Group 1: explicit prefix (CARC: 50), Group 2: EOB prefix (CO-50)
-        code = m.group(1) or m.group(2)
-        if code:
-            codes.append(code.strip())
-    return list(dict.fromkeys(codes))
+        if m.group(1):
+            # Explicit form: "CARC: 50" or "adjustment reason code 50"
+            code = m.group(1).strip()
+            if code not in code_groups:
+                codes.append(code)
+                code_groups[code] = ""  # no group prefix in explicit form
+        elif m.group(3):
+            # EOB group-prefix form: "CO-50", "PR-27"
+            prefix = m.group(2).upper()
+            code = m.group(3).strip()
+            if code not in code_groups:
+                codes.append(code)
+                code_groups[code] = prefix
+            elif code_groups[code] == "":
+                # Upgrade to group-prefix if we previously saw explicit form
+                code_groups[code] = prefix
+
+    return list(dict.fromkeys(codes)), code_groups
 
 
 def extract_pass1(text: str) -> dict[str, Any]:
@@ -461,6 +528,8 @@ def extract_pass1(text: str) -> dict[str, Any]:
         if d:
             service_date_str = d.isoformat()
 
+    carc_codes, carc_code_groups = _extract_carc(text)
+
     return {
         # Identification
         "claim_reference_number": _first_match(_PATTERNS["claim_number"], text),
@@ -493,8 +562,9 @@ def extract_pass1(text: str) -> dict[str, Any]:
         "currency_amounts": currencies,
         "financial_labeled": extract_labeled_financials(text),
 
-        # Denial codes — CARC pattern has 2 groups: (explicit-prefix, group-prefix)
-        "carc_codes": _extract_carc(text),
+        # Denial codes — code list (backward-compatible) + group prefix map (new)
+        "carc_codes": carc_codes,
+        "carc_code_groups": carc_code_groups,  # {code: "CO"|"PR"|"OA"|""}
         "rarc_codes": _all_matches(_PATTERNS["rarc"], text),
 
         # Prior auth

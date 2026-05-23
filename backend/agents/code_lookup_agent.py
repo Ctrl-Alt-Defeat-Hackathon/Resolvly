@@ -30,7 +30,7 @@ from tools.cms_icd_lookup import lookup_icd10
 from tools.cms_hcpcs_lookup import lookup_cpt_hcpcs
 from tools.carc_rarc_lookup import lookup_carc, lookup_rarc
 from tools.npi_registry import lookup_npi
-from tools.web_search import web_search
+from tools.code_cache import get_cached, set_cached
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,40 @@ def _parse_carc_code(raw: str) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Cache-aware lookup wrappers
+# ---------------------------------------------------------------------------
+
+async def _cached_lookup_icd10(code: str):
+    cached = await get_cached("icd10", code)
+    if cached is not None:
+        from tools.cms_icd_lookup import ICD10Result
+        return ICD10Result(**cached)
+    result = await lookup_icd10(code)
+    await set_cached("icd10", code, result.model_dump())
+    return result
+
+
+async def _cached_lookup_cpt_hcpcs(code: str):
+    cached = await get_cached("cpt", code)
+    if cached is not None:
+        from tools.cms_hcpcs_lookup import HCPCSResult
+        return HCPCSResult(**cached)
+    result = await lookup_cpt_hcpcs(code)
+    await set_cached("cpt", code, result.model_dump())
+    return result
+
+
+async def _cached_lookup_npi(npi: str):
+    cached = await get_cached("npi", npi)
+    if cached is not None:
+        from tools.npi_registry import NPIResult
+        return NPIResult(**cached)
+    result = await lookup_npi(npi)
+    await set_cached("npi", npi, result.model_dump(), ttl_days=7)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Main agent function
 # ---------------------------------------------------------------------------
 
@@ -90,36 +124,40 @@ async def run_code_lookup_agent(claim: ClaimObject) -> CodeLookupResult:
     """
     Look up all codes in the ClaimObject using the appropriate tools.
 
-    Runs all lookups in parallel for speed, then assembles the results.
+    Results are read from / written to a SQLite TTL cache so that repeated
+    lookups of the same codes (J44.9, CARC 50, etc.) skip the network call.
+
+    Codes that fail to resolve are recorded in claim.service_billing.unverified_codes
+    and excluded from appeal letter citations.
     """
     result = CodeLookupResult()
     tasks: list[tuple[str, str, Any]] = []  # (key, code_type, coroutine)
 
     # ICD-10 codes
     for code in claim.service_billing.icd10_diagnosis_codes:
-        tasks.append((code, "icd10", lookup_icd10(code)))
+        tasks.append((code, "icd10", _cached_lookup_icd10(code)))
 
     # CPT codes
     for code in claim.service_billing.cpt_procedure_codes:
-        tasks.append((code, "cpt", lookup_cpt_hcpcs(code)))
+        tasks.append((code, "cpt", _cached_lookup_cpt_hcpcs(code)))
 
     # HCPCS codes
     for code in claim.service_billing.hcpcs_codes:
-        tasks.append((code, "hcpcs", lookup_cpt_hcpcs(code)))
+        tasks.append((code, "hcpcs", _cached_lookup_cpt_hcpcs(code)))
 
-    # CARC codes
+    # CARC codes (local table — no network, no cache needed)
     for raw_code in claim.denial_reason.carc_codes:
         group, number = _parse_carc_code(raw_code)
         tasks.append((raw_code, "carc", lookup_carc(number, group)))
 
-    # RARC codes
+    # RARC codes (local table — no network, no cache needed)
     for code in claim.denial_reason.rarc_codes:
         tasks.append((code, "rarc", lookup_rarc(code)))
 
     # NPI
     if claim.patient_provider.treating_provider_npi:
         npi = claim.patient_provider.treating_provider_npi
-        tasks.append((npi, "npi", lookup_npi(npi)))
+        tasks.append((npi, "npi", _cached_lookup_npi(npi)))
 
     if not tasks:
         logger.info("No codes to look up in ClaimObject")
@@ -219,31 +257,17 @@ async def run_code_lookup_agent(claim: ClaimObject) -> CodeLookupResult:
                     entity=key, source_name=outcome.source, url=outcome.source_url,
                 ))
 
-    # Attempt web search fallback for codes not found
-    unfound = [
-        (key, desc.code_type)
-        for key, desc in result.codes.items()
-        if not desc.found
-    ]
-    if unfound:
-        logger.info(f"Web search fallback for {len(unfound)} unfound codes")
-        fallback_tasks = []
-        for key, code_type in unfound:
-            query = f"{code_type.upper()} code {key} medical billing description"
-            fallback_tasks.append((key, web_search(query, num_results=1)))
-
-        fallback_outcomes = await asyncio.gather(
-            *[t[1] for t in fallback_tasks], return_exceptions=True,
+    # Flag unverified codes on the ClaimObject — excluded from appeal letter citations.
+    # No web-search fallback: uncurated snippets pollute LLM prompts with noisy descriptions.
+    unverified = [key for key, desc in result.codes.items() if not desc.found]
+    if unverified:
+        claim.service_billing.unverified_codes = list(
+            set(claim.service_billing.unverified_codes) | set(unverified)
         )
-
-        for (key, _), outcome in zip(fallback_tasks, fallback_outcomes):
-            if isinstance(outcome, Exception) or not outcome.found:
-                continue
-            if outcome.results:
-                snippet = outcome.results[0].get("snippet", "")
-                if snippet and key in result.codes:
-                    result.codes[key].description += f" (Web: {snippet})"
-                    result.codes[key].source += " + Web Search"
+        logger.info(
+            f"Code Lookup Agent: {len(unverified)} unverified codes flagged "
+            f"(excluded from citations): {unverified}"
+        )
 
     found_count = sum(1 for c in result.codes.values() if c.found)
     total = len(result.codes)

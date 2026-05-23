@@ -10,9 +10,15 @@ Benefits over the previous single-call approach:
   - A JSON parse failure in one call does not lose the other two groups of fields
   - Each call uses a smaller, more focused context window (≤40k chars)
   - Fields already found by Pass 1 regex are skipped to save tokens
+  - Each field carries a 0.0-1.0 confidence so the pipeline can prefer high-confidence
+    LLM extractions over lower-confidence regex matches in the confidence aggregator
+
+Per-field confidence format (returned by every call):
+  Each extracted field is accompanied by a parallel key "<field>_confidence": 0.0–1.0
+  Example: {"patient_full_name": "Jane Doe", "patient_full_name_confidence": 0.95}
 
 Input:  raw document text + Pass 1 regex results
-Output: dict of extracted fields to merge into the ClaimObject
+Output: dict of extracted fields (+ confidence keys) to merge into the ClaimObject
 """
 from __future__ import annotations
 
@@ -34,7 +40,12 @@ IMPORTANT RULES:
 2. If a field is not found, return null for that field.
 3. For dates, return in YYYY-MM-DD format.
 4. For dollar amounts, return as numbers without the $ sign (e.g., 1500.00).
-5. Return ONLY a JSON object with the requested fields. Use null for fields not found."""
+5. For each field you extract, also return a confidence score (0.0–1.0) as "<field_name>_confidence".
+   - 0.9–1.0: field label + value appeared verbatim (e.g., "Patient: Jane Doe")
+   - 0.7–0.89: value inferred from clear context (e.g., name in signature block)
+   - 0.5–0.69: best guess; multiple possible interpretations
+   - 0.0–0.49: very uncertain or reconstructed
+6. Return ONLY a JSON object with the requested fields and their confidence keys. Use null for fields not found."""
 
 
 def _repair_truncated_json(text: str) -> str:
@@ -55,13 +66,11 @@ def _safe_json_loads(text: str) -> dict[str, Any]:
     """Parse JSON with fence stripping and repair for truncated responses."""
     if not text:
         return {}
-    # Strip markdown fences
     t = text.strip()
     if t.startswith("```"):
         t = re.sub(r"^```(?:json)?\s*", "", t, count=1)
         t = re.sub(r"\s*```\s*$", "", t)
         t = t.strip()
-    # Find the outermost JSON object
     start = t.find("{")
     end = t.rfind("}")
     if start != -1 and end != -1 and end > start:
@@ -76,6 +85,15 @@ def _safe_json_loads(text: str) -> dict[str, Any]:
             return {}
 
 
+def _extract_confidences(result: dict[str, Any]) -> dict[str, float]:
+    """Pull out the per-field confidence values from an LLM result dict."""
+    return {
+        key.replace("_confidence", ""): float(val)
+        for key, val in result.items()
+        if key.endswith("_confidence") and isinstance(val, (int, float))
+    }
+
+
 # ---------------------------------------------------------------------------
 # Call 1 — NER entities
 # ---------------------------------------------------------------------------
@@ -83,6 +101,8 @@ def _safe_json_loads(text: str) -> dict[str, Any]:
 async def _extract_entities(text: str) -> dict[str, Any]:
     """Extract patient/provider names, facility, network status, document type."""
     prompt = f"""Extract the following entities from this medical document. Return JSON only.
+
+For each field, also return "<field_name>_confidence" (0.0-1.0) indicating extraction certainty.
 
 Fields (use null if not found):
 - patient_full_name: patient's full name
@@ -104,7 +124,8 @@ Document text:
             priority=1,
         )
         result = _safe_json_loads(response)
-        logger.debug(f"Pass 2 entities: extracted {sum(1 for v in result.values() if v is not None)} fields")
+        non_null = sum(1 for k, v in result.items() if v is not None and not k.endswith("_confidence"))
+        logger.debug(f"Pass 2 entities: extracted {non_null} fields")
         return result
     except Exception as e:
         logger.warning(f"Pass 2 entities extraction failed: {e}")
@@ -117,7 +138,6 @@ Document text:
 
 async def _extract_narrative(text: str, pass1: dict[str, Any]) -> dict[str, Any]:
     """Extract denial reason prose, plan provision, clinical criteria, prior auth status."""
-    # Skip fields already found confidently by Pass 1
     skip_prior_auth = pass1.get("prior_auth_status") not in (None, "required_unknown")
 
     fields_block = """Fields (use null if not found):
@@ -132,6 +152,8 @@ async def _extract_narrative(text: str, pass1: dict[str, Any]) -> dict[str, Any]
 
     prompt = f"""Extract the following fields from this insurance denial document. Return JSON only.
 
+For each field, also return "<field_name>_confidence" (0.0-1.0) indicating extraction certainty.
+
 {fields_block}
 
 Document text:
@@ -145,7 +167,8 @@ Document text:
             priority=1,
         )
         result = _safe_json_loads(response)
-        logger.debug(f"Pass 2 narrative: extracted {sum(1 for v in result.values() if v is not None)} fields")
+        non_null = sum(1 for k, v in result.items() if v is not None and not k.endswith("_confidence"))
+        logger.debug(f"Pass 2 narrative: extracted {non_null} fields")
         return result
     except Exception as e:
         logger.warning(f"Pass 2 narrative extraction failed: {e}")
@@ -158,7 +181,6 @@ Document text:
 
 async def _extract_contact(text: str, pass1: dict[str, Any]) -> dict[str, Any]:
     """Extract appeal deadlines as stated, contact info, expedited flag, financial amounts."""
-    # Skip financial fields already extracted by labeled regex
     labeled = pass1.get("financial_labeled", {})
     financial_fields_needed = [
         f for f in (
@@ -174,6 +196,8 @@ async def _extract_contact(text: str, pass1: dict[str, Any]) -> dict[str, Any]:
         financial_block = "\n- " + "\n- ".join(financial_fields_needed) + " (numeric, no $ sign)"
 
     prompt = f"""Extract the following fields from this insurance document. Return JSON only.
+
+For each field, also return "<field_name>_confidence" (0.0-1.0) indicating extraction certainty.
 
 Fields (use null if not found):
 - internal_appeal_deadline_stated: deadline text as written (e.g. "within 180 days of this notice")
@@ -195,7 +219,8 @@ Document text:
             priority=1,
         )
         result = _safe_json_loads(response)
-        logger.debug(f"Pass 2 contact: extracted {sum(1 for v in result.values() if v is not None)} fields")
+        non_null = sum(1 for k, v in result.items() if v is not None and not k.endswith("_confidence"))
+        logger.debug(f"Pass 2 contact: extracted {non_null} fields")
         return result
     except Exception as e:
         logger.warning(f"Pass 2 contact extraction failed: {e}")
@@ -214,7 +239,8 @@ async def extract_pass2(
     Run LLM-powered entity extraction (Pass 2) as 3 parallel focused calls.
 
     Each call targets a distinct field group. A failure in one call does not
-    affect the other two. Returns merged results; empty dict if all calls fail.
+    affect the other two. Returns merged results including per-field confidence
+    keys (<field>_confidence: float). Empty dict if all calls fail.
     """
     settings = get_settings()
     if not settings.openai_api_key:
@@ -231,12 +257,19 @@ async def extract_pass2(
         logger.error(f"Pass 2 parallel extraction failed: {e}")
         return {}
 
-    # Merge all three results; later calls do not overwrite earlier non-null values
+    # Merge all three results; later calls do not overwrite earlier non-null values.
+    # Confidence keys (_confidence suffix) always take the latest non-null value
+    # since they're independent per field group.
     merged: dict[str, Any] = {}
     for result in (entities, narrative, contact):
         for key, value in result.items():
-            if value is not None and value != "" and value != [] and key not in merged:
+            if key.endswith("_confidence"):
+                # Always merge confidence values (they don't conflict across groups)
+                if value is not None:
+                    merged[key] = value
+            elif value is not None and value != "" and value != [] and key not in merged:
                 merged[key] = value
 
-    logger.info(f"Pass 2 extracted {len(merged)} fields via LLM ({3} parallel calls)")
+    value_fields = sum(1 for k in merged if not k.endswith("_confidence"))
+    logger.info(f"Pass 2 extracted {value_fields} fields via LLM (3 parallel calls)")
     return merged

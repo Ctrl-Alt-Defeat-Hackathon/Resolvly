@@ -40,45 +40,54 @@ class CompletenessResult(BaseModel):
 def check_completeness(claim: ClaimObject) -> CompletenessResult:
     """
     Check how complete the denial letter is against regulatory requirements.
+
+    Weighted scoring: critical fields (denial reason, clinical criteria) count 2×;
+    all others count 1×.
     """
     regulation_type = claim.identification.erisa_or_state_regulated or RegulationType.unknown
     denial = claim.denial_reason
     appeal = claim.appeal_rights
+    narrative_lower = (denial.denial_reason_narrative or "").lower()
 
-    # Define required fields and their presence checks
-    checks: list[tuple[str, bool]] = [
-        # Core denial info
+    # (name, present, weight) — critical fields use weight=2
+    checks: list[tuple[str, bool, int]] = [
+        # Core denial info — critical (weight 2)
         (
             "Specific denial reason or narrative",
             bool(denial.denial_reason_narrative and len(denial.denial_reason_narrative) > 20),
-        ),
-        (
-            "Reference to specific plan provision cited",
-            bool(denial.plan_provision_cited),
+            2,
         ),
         (
             "Clinical criteria or scientific evidence cited",
             bool(denial.clinical_criteria_cited or denial.medical_necessity_statement),
+            2,
         ),
-        # CARC/denial codes
+        # Standard required elements (weight 1)
+        (
+            "Reference to specific plan provision cited",
+            bool(denial.plan_provision_cited),
+            1,
+        ),
         (
             "Claim adjustment reason code(s) provided",
             bool(denial.carc_codes),
+            1,
         ),
-        # Appeal rights
         (
             "Internal appeal process described",
             bool(appeal.internal_appeal_deadline_stated),
+            1,
         ),
         (
             "External review rights mentioned",
             bool(appeal.external_review_deadline_stated),
+            1,
         ),
         (
             "Expedited review availability noted",
-            appeal.expedited_review_available is not None,
+            appeal.expedited_review_available is True,
+            1,
         ),
-        # Contact info
         (
             "Insurer appeals contact information provided",
             bool(
@@ -86,25 +95,43 @@ def check_completeness(claim: ClaimObject) -> CompletenessResult:
                 or appeal.insurer_appeals_phone
                 or appeal.insurer_appeals_address
             ),
+            1,
         ),
         (
             "State insurance commissioner reference included",
             bool(appeal.state_commissioner_info_present),
+            1,
         ),
     ]
 
-    # Add ERISA-specific checks
+    # ERISA-specific checks (weight 1 each)
     if regulation_type == RegulationType.erisa:
-        checks.append((
-            "ERISA § 502(a) civil action rights mentioned",
-            # We infer from the presence of an external review deadline
-            bool(appeal.internal_appeal_deadline_stated),
-        ))
+        # § 503 / 29 CFR § 2560.503-1: notice of civil action rights under § 502(a)
+        erisa_502_mentioned = any(
+            t in narrative_lower for t in ("502", "civil action", "federal court", "erisa")
+        )
+        checks.append(("ERISA § 502(a) civil action rights mentioned", erisa_502_mentioned, 1))
 
-    present = [name for name, present in checks if present]
-    missing = [name for name, present in checks if not present]
+        # 29 CFR § 2560.503-1(g)(1)(vii): right to submit additional information during appeal
+        right_to_submit = any(
+            t in narrative_lower
+            for t in ("additional information", "supporting documentation", "new evidence", "submit")
+        )
+        checks.append(("Right to submit additional information during appeal", right_to_submit, 1))
 
-    score = len(present) / len(checks) if checks else 0.0
+        # 29 CFR § 2560.503-1(h)(2)(iii): right to receive plan documents upon request
+        plan_docs_mentioned = any(
+            t in narrative_lower
+            for t in ("plan documents", "summary plan description", "spd", "plan document")
+        )
+        checks.append(("Right to receive plan documents upon request", plan_docs_mentioned, 1))
+
+    present = [name for name, present, _ in checks if present]
+    missing = [name for name, present, _ in checks if not present]
+
+    weighted_present = sum(w for _, p, w in checks if p)
+    weighted_total = sum(w for _, _, w in checks)
+    score = weighted_present / weighted_total if weighted_total else 0.0
     deficient = score < 0.75
 
     # Determine escalation availability

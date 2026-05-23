@@ -38,6 +38,8 @@ class DocumentResult(BaseModel):
     ocr_confidence: float | None
     page_count: int
     needs_client_ocr: bool
+    has_mixed_content: bool = False
+    scanned_page_numbers: list[int] = []
 
 
 class UploadResponse(BaseModel):
@@ -94,6 +96,8 @@ async def upload_documents(
                 ocr_confidence=result.ocr_confidence,
                 page_count=result.page_count,
                 needs_client_ocr=result.needs_client_ocr,
+                has_mixed_content=result.has_mixed_content,
+                scanned_page_numbers=result.scanned_page_numbers,
             )
         )
 

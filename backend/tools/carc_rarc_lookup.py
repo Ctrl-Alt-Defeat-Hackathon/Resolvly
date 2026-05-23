@@ -70,6 +70,16 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "The billing says the service happened in a location that doesn't match the procedure type.",
         "common_fix": "Ask your provider to verify and correct the place of service code, then resubmit.",
     },
+    "7": {
+        "description": "The procedure/revenue code is inconsistent with the patient's gender.",
+        "plain_english": "The procedure billed is typically for a different gender than yours.",
+        "common_fix": "Contact your provider's billing office to verify the procedure and demographic information are correct.",
+    },
+    "8": {
+        "description": "The procedure code is inconsistent with the provider type/specialty (taxonomy).",
+        "plain_english": "The service billed doesn't match what your type of provider normally does.",
+        "common_fix": "Contact your provider's billing office to verify the procedure code matches the provider's specialty.",
+    },
     "6": {
         "description": "The procedure/revenue code is inconsistent with the patient's age.",
         "plain_english": "The procedure billed is typically for a different age group than yours.",
@@ -85,6 +95,21 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "The diagnosis code doesn't match the procedure that was performed — this may be a coding error.",
         "common_fix": "Contact your provider's billing office to verify the ICD-10 and CPT code pairing.",
     },
+    "12": {
+        "description": "The diagnosis is inconsistent with the patient's gender.",
+        "plain_english": "The diagnosis code on the claim doesn't match your gender.",
+        "common_fix": "Ask your provider to verify the diagnosis code is correct for your gender.",
+    },
+    "13": {
+        "description": "The date of death precedes the date of service.",
+        "plain_english": "Records indicate the patient was deceased before the service date — a records error.",
+        "common_fix": "Contact the insurer immediately with proof of the correct dates.",
+    },
+    "14": {
+        "description": "The date of birth follows the date of service.",
+        "plain_english": "The patient's birth date on record is after the service date, which is impossible.",
+        "common_fix": "Contact your provider to correct the demographic information.",
+    },
     "15": {
         "description": "The authorization number is missing, invalid, or does not apply to the billed services.",
         "plain_english": "Your insurance required prior authorization for this service, and the authorization number wasn't included or is invalid.",
@@ -95,10 +120,20 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "The claim was missing required information or had errors in how it was submitted.",
         "common_fix": "Contact your provider's billing office to correct the errors and resubmit the claim.",
     },
+    "17": {
+        "description": "Payment adjusted because this procedure/service is not paid separately.",
+        "plain_english": "This service is included in the payment for the main procedure — it cannot be billed separately.",
+        "common_fix": "Contact your provider's billing office to review the bundling rules.",
+    },
     "18": {
         "description": "Exact duplicate claim/service.",
         "plain_english": "This same claim was already submitted and processed — this is a duplicate.",
         "common_fix": "No action needed if the original claim was paid. If not, contact billing to investigate.",
+    },
+    "19": {
+        "description": "Claim/service denied because this is a work-related injury/illness and should be addressed by the Worker's Compensation carrier.",
+        "plain_english": "Your insurer believes this injury or illness happened at work and should be covered by Workers' Compensation instead.",
+        "common_fix": "File a Workers' Compensation claim if this is work-related. If not, provide evidence the injury was not work-related.",
     },
     "22": {
         "description": "This care may be covered by another payer per coordination of benefits.",
@@ -110,6 +145,11 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "The amount was adjusted based on what your other insurance already paid.",
         "common_fix": "Verify that your primary insurance was billed first and review the coordination of benefits.",
     },
+    "26": {
+        "description": "Expenses incurred prior to coverage.",
+        "plain_english": "The service occurred before your insurance coverage started.",
+        "common_fix": "Verify your coverage start date. If you were covered, submit proof of your coverage effective date.",
+    },
     "27": {
         "description": "Expenses incurred after coverage terminated.",
         "plain_english": "The service happened after your insurance coverage ended.",
@@ -120,10 +160,35 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "The claim was submitted too late — past the insurer's filing deadline.",
         "common_fix": "Contact your provider immediately — they may be responsible for late filing. Check if a timely filing exception applies.",
     },
+    "31": {
+        "description": "Claim denied as patient cannot be identified as our insured.",
+        "plain_english": "Your insurer cannot find you in their records as a covered member.",
+        "common_fix": "Verify your member ID is correct. Contact your insurer's enrollment department to confirm your coverage.",
+    },
+    "35": {
+        "description": "Lifetime benefit maximum has been reached.",
+        "plain_english": "You've reached the maximum lifetime benefit allowed under your policy for this type of service.",
+        "common_fix": "Review your plan documents for lifetime limits. Note that ACA-compliant plans cannot apply lifetime limits on essential health benefits.",
+    },
+    "38": {
+        "description": "Services not provided or authorized by designated (network/primary care) providers.",
+        "plain_english": "The service was not authorized or provided by a provider in your plan's network.",
+        "common_fix": "Check if an in-network provider was available and if so why an out-of-network provider was used. File an appeal if you had no in-network options.",
+    },
+    "39": {
+        "description": "Services denied at the time authorization/pre-certification was requested.",
+        "plain_english": "Authorization was requested but denied before the service was provided.",
+        "common_fix": "File an appeal with clinical documentation supporting why the service was necessary.",
+    },
     "45": {
         "description": "Charge exceeds fee schedule/maximum allowable or contracted/legislated fee arrangement.",
         "plain_english": "The amount charged is higher than what your insurance plan allows for this service.",
         "common_fix": "Check if you have balance billing protections. The provider may need to accept the allowed amount.",
+    },
+    "49": {
+        "description": "These are non-covered services because this is not deemed a medical necessity by the payer.",
+        "plain_english": "Your insurer has determined this service is not medically necessary under their criteria.",
+        "common_fix": "Request your provider submit a detailed letter of medical necessity with clinical documentation.",
     },
     "50": {
         "description": "These are non-covered services because this is not deemed a 'medical necessity' under the payer's definition.",
@@ -145,6 +210,21 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "Your insurer thinks the treatment should have been done in a different setting (e.g., outpatient instead of inpatient).",
         "common_fix": "Ask your provider to document why the specific care setting was necessary.",
     },
+    "60": {
+        "description": "Charges for outpatient services with this proximity to inpatient services are not covered.",
+        "plain_english": "These outpatient services were too close in time to an inpatient admission and are not separately payable.",
+        "common_fix": "Contact your provider's billing office to review whether these services should be bundled with the inpatient claim.",
+    },
+    "91": {
+        "description": "Claim/service denied because CVN is missing/incorrect.",
+        "plain_english": "The claim was denied because the card verification number was missing or incorrect.",
+        "common_fix": "Contact your provider's billing office to correct the submission information.",
+    },
+    "95": {
+        "description": "Plan procedures not followed.",
+        "plain_english": "The required plan procedures (such as getting a referral or pre-authorization) were not followed.",
+        "common_fix": "Review your plan documents for required procedures. Contact your provider about obtaining the necessary authorizations.",
+    },
     "96": {
         "description": "Non-covered charge(s). At least one Remark Code must be provided.",
         "plain_english": "Your plan simply doesn't cover this service.",
@@ -155,6 +235,11 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "This service is already included ('bundled') with another service that was billed.",
         "common_fix": "Contact your provider's billing office — they may need to use a modifier to unbundle the codes if the services were truly separate.",
     },
+    "100": {
+        "description": "Payment made to patient/insured/responsible party.",
+        "plain_english": "The payment was already sent directly to the patient rather than the provider.",
+        "common_fix": "If you received a check from your insurer for this claim, forward it to your provider.",
+    },
     "109": {
         "description": "Claim/service not covered by this payer/contractor.",
         "plain_english": "Your insurance plan doesn't cover this service at all under your current policy.",
@@ -164,6 +249,11 @@ _CARC_TABLE: dict[str, dict] = {
         "description": "Benefit maximum for this time period or occurrence has been reached.",
         "plain_english": "You've used up the maximum number of visits or dollar amount your plan allows for this service.",
         "common_fix": "Check your plan's annual limits. If medically necessary, request an exception to the limit.",
+    },
+    "144": {
+        "description": "Incentive adjustment, e.g. preferred product/service.",
+        "plain_english": "Payment was adjusted due to a plan incentive program for preferred products or services.",
+        "common_fix": "Review your plan's preferred product list to see if an alternative covered service exists.",
     },
     "151": {
         "description": "Payment adjusted because the payer deems the information submitted does not support this many services.",
@@ -180,10 +270,35 @@ _CARC_TABLE: dict[str, dict] = {
         "plain_english": "Your insurance required advance approval (prior authorization) for this service, and it wasn't obtained before the procedure.",
         "common_fix": "Contact your provider — they may be able to request retroactive authorization. If denied, the provider may be financially responsible.",
     },
+    "198": {
+        "description": "Precertification/authorization exceeded.",
+        "plain_english": "The authorized services were exceeded — more services were provided than what was pre-approved.",
+        "common_fix": "Contact your provider to request a retroactive authorization amendment for the additional services.",
+    },
+    "200": {
+        "description": "Expenses incurred during lapse in coverage.",
+        "plain_english": "Your coverage had lapsed when the service was provided.",
+        "common_fix": "Verify your coverage dates. If there was an administrative error causing the lapse, contact your insurer's enrollment department.",
+    },
     "204": {
         "description": "This service/equipment/drug is not covered under the patient's current benefit plan.",
         "plain_english": "Your specific benefit plan doesn't include coverage for this service.",
         "common_fix": "Review your plan documents. Ask your insurer about alternative covered options.",
+    },
+    "222": {
+        "description": "Exceeds the contracted maximum number of hours/days/units by this provider for this period.",
+        "plain_english": "The provider has billed more hours, days, or units than your plan allows in this time period.",
+        "common_fix": "Contact your provider to verify the billing is correct. If you need more services, request a medical exception.",
+    },
+    "226": {
+        "description": "Information requested from the Billing/Rendering Provider was not provided or was insufficient/incomplete.",
+        "plain_english": "Your insurer asked for additional information from your provider, but it was not provided or was incomplete.",
+        "common_fix": "Contact your provider's billing office and ask them to submit the requested information.",
+    },
+    "227": {
+        "description": "Information requested from the patient/insured/responsible party was not provided or was insufficient/incomplete.",
+        "plain_english": "Your insurer asked you for additional information, but you did not provide it or the information was incomplete.",
+        "common_fix": "Contact your insurer to find out what information they need and submit it promptly.",
     },
     "242": {
         "description": "Services not provided by network/primary care providers.",

@@ -45,10 +45,27 @@ class EmployerPlanType(str, Enum):
     unknown = "unknown"
 
 
+class EmployerSize(str, Enum):
+    under_50 = "under_50"          # ALEs exempt; almost never self-funded
+    size_50_999 = "size_50_999"    # mixed; moderate prior for self-funded
+    size_1000_plus = "size_1000_plus"  # strong prior for ERISA self-funded (~80%)
+    unknown = "unknown"
+
+
+class MarketplaceType(str, Enum):
+    subsidized = "subsidized"      # HealthCare.gov / state exchange with subsidy
+    off_exchange = "off_exchange"  # directly from insurer, no subsidy
+    unknown = "unknown"
+
+
 class WizardRequest(BaseModel):
     source: PlanSource
     employer_plan_type: EmployerPlanType | None = None
+    employer_size: EmployerSize | None = None
+    marketplace_type: MarketplaceType | None = None
     state: str = "IN"
+    # Set to True when the extracted denial letter explicitly cites ERISA § 503
+    erisa_citation_in_denial: bool = False
 
 
 class Regulator(BaseModel):
@@ -73,6 +90,9 @@ class WizardResponse(BaseModel):
     primary_regulator: Regulator
     applicable_laws: list[dict]
     state_specific: StateSpecific | None
+    # How the regulation_type was determined — displayed in the assumptions panel
+    regulation_type_source: str = "user"       # "user" | "extracted" | "defaulted"
+    assumption_note: str = ""                  # human-readable explanation of any assumption made
 
 
 def _get_state_doi(state: str) -> StateSpecific | None:
@@ -198,45 +218,109 @@ def _build_individual_response(state: str) -> WizardResponse:
     )
 
 
+def _employer_size_suggests_erisa(size: EmployerSize | None) -> bool:
+    """Large employers (1000+) self-fund ~80% of the time → strong ERISA prior."""
+    return size == EmployerSize.size_1000_plus
+
+
 @router.post("/plan-type", response_model=WizardResponse, status_code=status.HTTP_200_OK)
 @limiter.limit("20/minute")
 async def plan_type_wizard(request: Request, body: WizardRequest) -> WizardResponse:
     state = body.state.upper() if body.state else "IN"
 
+    # ERISA citation override: if the denial letter explicitly cites ERISA § 503,
+    # trust the extracted evidence over the wizard's answer.
+    if body.erisa_citation_in_denial:
+        resp = _build_erisa_response(state)
+        resp = await _merge_dynamic_laws(resp, "erisa")
+        resp.regulation_type_source = "extracted"
+        resp.assumption_note = (
+            "Your denial letter explicitly cites ERISA § 503. "
+            "We are treating this plan as ERISA-governed (overrides your wizard selection)."
+        )
+        return resp
+
     if body.source == PlanSource.employer:
         emp_type = body.employer_plan_type or EmployerPlanType.unknown
+
         if emp_type == EmployerPlanType.erisa:
-            return await _merge_dynamic_laws(_build_erisa_response(state), "erisa")
-        elif emp_type == EmployerPlanType.fully_insured:
-            return await _merge_dynamic_laws(_build_state_response(state), "state_aca")
-        else:
-            # Default to fully-insured (state-regulated): ~60% of employer plans are fully
-            # insured. ERISA self-funded is the minority; defaulting to ERISA was causing
-            # wrong deadlines, wrong regulator, and wrong routing cards for most users.
-            resp = _build_state_response(state)
-            resp = await _merge_dynamic_laws(resp, "state_aca")
-            resp.applicable_laws = list(resp.applicable_laws) + [
-                {
-                    "law": "Plan type assumed — fully insured (state-regulated)",
-                    "section": "Verify SPD / plan documents",
-                    "relevance": "We assumed your employer plan is fully insured (state DOI "
-                    "regulates it) because most employer plans are. If your plan is ERISA "
-                    "self-funded (large employer, 1,000+ employees), contact your HR department "
-                    "and re-run this wizard selecting 'ERISA self-funded'. ERISA plans have "
-                    "different appeal rules — DOL EBSA, no external review.",
-                    "url": "https://www.dol.gov/agencies/ebsa",
-                    "source": "U.S. Department of Labor (EBSA)",
-                }
-            ]
+            resp = await _merge_dynamic_laws(_build_erisa_response(state), "erisa")
+            resp.regulation_type_source = "user"
             return resp
 
+        elif emp_type == EmployerPlanType.fully_insured:
+            resp = await _merge_dynamic_laws(_build_state_response(state), "state_aca")
+            resp.regulation_type_source = "user"
+            return resp
+
+        else:
+            # employer_type = unknown: apply Bayesian update from employer_size.
+            # Large employers (1000+) self-fund ~80% → default to ERISA.
+            # Otherwise default to fully-insured (state-regulated): ~60% of employer plans.
+            if _employer_size_suggests_erisa(body.employer_size):
+                resp = await _merge_dynamic_laws(_build_erisa_response(state), "erisa")
+                resp.regulation_type_source = "defaulted"
+                resp.assumption_note = (
+                    "We assumed ERISA self-funded based on your employer size (1,000+ employees). "
+                    "Large employers self-fund ~80% of health plans. "
+                    "Verify with your HR department — if the plan is fully insured, "
+                    "re-run this wizard selecting 'Fully insured (state-regulated)'."
+                )
+                resp.applicable_laws = list(resp.applicable_laws) + [
+                    {
+                        "law": "Plan type assumed — ERISA self-funded (large employer)",
+                        "section": "Verify with HR / Summary Plan Description",
+                        "relevance": resp.assumption_note,
+                        "url": "https://www.dol.gov/agencies/ebsa",
+                        "source": "U.S. Department of Labor (EBSA)",
+                    }
+                ]
+                return resp
+            else:
+                resp = _build_state_response(state)
+                resp = await _merge_dynamic_laws(resp, "state_aca")
+                resp.regulation_type_source = "defaulted"
+                resp.assumption_note = (
+                    "We assumed your employer plan is fully insured (state-regulated) "
+                    "because most employer plans are (~60%). "
+                    "If your employer has 1,000+ employees and the plan is ERISA self-funded, "
+                    "re-run this wizard selecting 'ERISA self-funded' — ERISA plans have "
+                    "different appeal rules (DOL EBSA regulates; external review may not apply)."
+                )
+                resp.applicable_laws = list(resp.applicable_laws) + [
+                    {
+                        "law": "Plan type assumed — fully insured (state-regulated)",
+                        "section": "Verify SPD / plan documents",
+                        "relevance": resp.assumption_note,
+                        "url": "https://www.dol.gov/agencies/ebsa",
+                        "source": "U.S. Department of Labor (EBSA)",
+                    }
+                ]
+                return resp
+
     elif body.source == PlanSource.marketplace:
-        return await _merge_dynamic_laws(_build_state_response(state), "state_aca")
+        resp = await _merge_dynamic_laws(_build_state_response(state), "state_aca")
+        resp.regulation_type_source = "user"
+        if body.marketplace_type == MarketplaceType.subsidized:
+            resp.assumption_note = (
+                "Subsidized marketplace plans (HealthCare.gov / state exchange) are ACA-compliant "
+                "and subject to full external review requirements."
+            )
+        elif body.marketplace_type == MarketplaceType.off_exchange:
+            resp.assumption_note = (
+                "Off-exchange individual plans must still comply with ACA requirements "
+                "including internal and external appeal rights."
+            )
+        return resp
 
     elif body.source == PlanSource.medicaid:
-        return await _merge_dynamic_laws(_build_medicaid_response(state), "medicaid")
+        resp = await _merge_dynamic_laws(_build_medicaid_response(state), "medicaid")
+        resp.regulation_type_source = "user"
+        return resp
 
     elif body.source == PlanSource.individual:
-        return await _merge_dynamic_laws(_build_individual_response(state), "state_aca")
+        resp = await _merge_dynamic_laws(_build_individual_response(state), "state_aca")
+        resp.regulation_type_source = "user"
+        return resp
 
     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unknown plan source.")

@@ -24,6 +24,9 @@ from analysis.deadline_calculator import calculate_deadlines, AppealDeadlines
 from analysis.completeness_checker import check_completeness, CompletenessResult
 from analysis.severity_triage import triage_severity
 from analysis.probability_estimator import estimate_probability, ProbabilityResult
+from analysis.financial_reconciliation import check_financial_reconciliation, FinancialReconciliationResult
+from analysis.validation_loop import run_validation_loop, ValidationLoopResult
+from agents.code_lookup_agent import CodeLookupResult
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +39,14 @@ class AnalysisResult(BaseModel):
     severity_triage: str = "routine"
     assumptions: list[dict[str, Any]] = []
     ics_events: list[dict] = []
+    financial_reconciliation: dict[str, Any] = {}
+    requires_review: bool = False
 
 
 async def run_analysis_agent(
     claim: ClaimObject,
     root_cause_result: RootCauseResult | None = None,
+    code_lookup_result: CodeLookupResult | None = None,
 ) -> AnalysisResult:
     """
     Run all analysis modules and return structured results.
@@ -96,8 +102,17 @@ async def run_analysis_agent(
     claim.derived.responsible_party = root_cause_result.responsible_party
     logger.info(f"Approval probability: {prob_result.score:.2f}")
 
-    # Step 7: Build assumptions list
+    # Step 7: Financial reconciliation (§5.2)
+    fin_result: FinancialReconciliationResult = check_financial_reconciliation(claim)
+
+    # Step 8: Validation loop — code resolution quality check (§5.1)
+    effective_code_result = code_lookup_result or CodeLookupResult()
+    val_result: ValidationLoopResult = run_validation_loop(claim, effective_code_result)
+
+    # Step 9: Build assumptions list (merge all sources)
     assumptions = _build_assumptions(claim, root_cause_result, completeness_result)
+    assumptions.extend(fin_result.assumptions)
+    assumptions.extend(val_result.assumptions)
 
     # Serialize to dicts for API response
     deadlines_dict: dict[str, Any] = {}
@@ -153,6 +168,12 @@ async def run_analysis_agent(
         severity_triage=final_severity.value,
         assumptions=assumptions,
         ics_events=deadlines.ics_events,
+        financial_reconciliation={
+            "reconciled": fin_result.reconciled,
+            "discrepancies": fin_result.discrepancies,
+            "implied_adjustment": fin_result.implied_adjustment,
+        },
+        requires_review=val_result.requires_review,
     )
 
 

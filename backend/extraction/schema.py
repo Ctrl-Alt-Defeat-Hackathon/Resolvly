@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import date
 from enum import Enum
-from typing import Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -46,6 +46,55 @@ class RootCauseCategory(str, Enum):
 
 
 # ---------------------------------------------------------------------------
+# Provenance — tracks where each extracted field came from
+# ---------------------------------------------------------------------------
+
+class FieldProvenance(BaseModel):
+    """Tracks the origin and confidence of a single extracted field."""
+    value: Any = None
+    source_doc_id: Optional[str] = None
+    extractor: Literal["regex", "llm", "user", "missing", "unknown"] = "unknown"
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source_url: Optional[str] = None
+    # Populated when Pass 1 and Pass 2 disagree on the same field.
+    # Contains [pass1_value, pass2_value] so the caller can surface the conflict.
+    disputed_values: list[Any] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# State-level appeal deadlines (replaces unstructured dict[str, str])
+# ---------------------------------------------------------------------------
+
+class StateDeadlines(BaseModel):
+    """Structured deadline information for a state's appeal process."""
+    internal_appeal_days: Optional[int] = None
+    external_review_days: Optional[int] = None
+    external_review_authority: Optional[str] = None
+    expedited_hours: Optional[int] = None
+    regulation_basis: Optional[str] = None
+    source_url: Optional[str] = None
+    last_verified: Optional[date] = None
+    note: Optional[str] = None
+
+    @classmethod
+    def from_legacy_dict(cls, d: dict[str, str]) -> "StateDeadlines":
+        """Convert from the old dict[str, str] format."""
+        def _int(v: str | None) -> int | None:
+            try:
+                return int(v) if v else None
+            except (ValueError, TypeError):
+                return None
+
+        return cls(
+            internal_appeal_days=_int(d.get("internal_appeal_days")),
+            external_review_days=_int(d.get("external_review_days")),
+            expedited_hours=_int(d.get("expedited_hours")),
+            regulation_basis=d.get("regulation_basis"),
+            note=d.get("note"),
+        )
+
+
+# ---------------------------------------------------------------------------
 # 3.1 Claim Identification
 # ---------------------------------------------------------------------------
 
@@ -59,6 +108,8 @@ class ClaimIdentification(BaseModel):
     plan_type: Optional[PlanType] = None
     plan_jurisdiction: Optional[str] = None          # e.g. "IN"
     erisa_or_state_regulated: Optional[RegulationType] = None
+    # Tracks how regulation_type was determined: "user" (wizard), "extracted" (denial letter), "defaulted"
+    regulation_type_source: Optional[Literal["user", "extracted", "defaulted"]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +141,8 @@ class ServiceBillingEntities(BaseModel):
     place_of_service_code: Optional[str] = None
     units_of_service: Optional[int] = None
     modifier_codes: list[str] = Field(default_factory=list)
+    # Codes extracted but not resolved against NLM/CMS — excluded from appeal letter citations
+    unverified_codes: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +168,9 @@ class FinancialEntities(BaseModel):
 class DenialReasonEntities(BaseModel):
     carc_codes: list[str] = Field(default_factory=list)
     rarc_codes: list[str] = Field(default_factory=list)
+    # Maps each CARC code to its group prefix (CO, PR, OA, PI, CR, or "" for explicit form)
+    # e.g. {"50": "CO", "1": "PR"} — drives responsible_party inference
+    carc_codes_with_group: dict[str, str] = Field(default_factory=dict)
     denial_reason_narrative: Optional[str] = None
     plan_provision_cited: Optional[str] = None
     clinical_criteria_cited: Optional[str] = None
@@ -139,7 +195,7 @@ class AppealRightsEntities(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# 3.7 Derived / Computed (filled by Analysis Agent)
+# 3.7 Derived / Computed (filled exclusively by Analysis Agent)
 # ---------------------------------------------------------------------------
 
 class DerivedEntities(BaseModel):
@@ -170,6 +226,9 @@ class ClaimObject(BaseModel):
     appeal_rights: AppealRightsEntities = Field(default_factory=AppealRightsEntities)
     derived: DerivedEntities = Field(default_factory=DerivedEntities)
 
+    # Per-field provenance: maps field name → extraction origin and confidence
+    provenance: dict[str, FieldProvenance] = Field(default_factory=dict)
+
 
 # ---------------------------------------------------------------------------
 # Extraction confidence
@@ -188,3 +247,5 @@ class PlanContext(BaseModel):
     plan_type: PlanType
     regulation_type: RegulationType
     state: str = "IN"
+    # How the regulation_type was determined — surfaces in the assumptions panel
+    regulation_type_source: Optional[Literal["user", "extracted", "defaulted"]] = None

@@ -13,10 +13,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from extraction.schema import ClaimObject, RegulationType
-from tools.idoi_search import search_idoi, IDOIResult
+from extraction.schema import ClaimObject, RegulationType, StateDeadlines
+from tools.idoi_search import search_idoi, IDOIResult, _STATE_RULES
 from tools.state_doi_lookup import get_doi_contact
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class StateRulesEnrichment(BaseModel):
     state: str = ""
     doi_contact: dict[str, Any] = {}
     appeal_rules: list[str] = []
-    state_deadlines: dict[str, str] = {}
+    state_deadlines: StateDeadlines = Field(default_factory=StateDeadlines)
     consumer_resources: list[dict] = []
     external_review_available: bool = False
     external_review_url: str = ""
@@ -101,30 +101,43 @@ async def run_state_rules_agent(claim: ClaimObject) -> StateRulesEnrichment:
 
         # Populate state_deadlines with actual deadline values based on regulation type
         if regulation_type == RegulationType.medicaid:
-            enrichment.state_deadlines = {
-                "internal_appeal_days": "90",
-                "external_review_days": "N/A — Medicaid uses fair hearing process",
-                "expedited_hours": "72 business hours for urgent cases",
-                "regulation_basis": "42 CFR § 431.220",
-                "note": "Medicaid fair hearing deadline. Verify with your state Medicaid agency.",
-            }
+            enrichment.state_deadlines = StateDeadlines(
+                internal_appeal_days=90,
+                external_review_days=None,
+                expedited_hours=72,
+                regulation_basis="42 CFR § 431.220",
+                note="Medicaid fair hearing deadline. External review uses fair hearing process. Verify with your state Medicaid agency.",
+            )
         elif regulation_type == RegulationType.erisa:
-            enrichment.state_deadlines = {
-                "internal_appeal_days": "180",
-                "external_review_days": "Civil action under ERISA § 502(a) after exhaustion",
-                "expedited_hours": "72 hours for urgent/concurrent care",
-                "regulation_basis": "29 CFR § 2560.503-1",
-                "note": "ERISA self-funded plan — state DOI does not regulate this plan.",
-            }
+            enrichment.state_deadlines = StateDeadlines(
+                internal_appeal_days=180,
+                external_review_days=None,
+                expedited_hours=72,
+                regulation_basis="29 CFR § 2560.503-1",
+                note="ERISA self-funded plan — state DOI does not regulate this plan. External recourse is civil action under ERISA § 502(a) after exhaustion.",
+            )
         else:
             # ACA / state-regulated (fully insured, marketplace, individual)
-            enrichment.state_deadlines = {
-                "internal_appeal_days": "180",
-                "external_review_days": "122",
-                "expedited_hours": "72",
-                "regulation_basis": "ACA § 2719 / 45 CFR § 147.136",
-                "note": "External review clock starts from internal appeal denial, not original denial.",
-            }
+            # Use curated state-specific deadline when available; fall back to ACA federal default (122)
+            curated = _STATE_RULES.get(state, {})
+            ext_days = curated.get("external_review_days", 122)
+            statute = curated.get("external_review_statute", "")
+            regulation_basis = f"ACA § 2719 / 45 CFR § 147.136"
+            if statute:
+                regulation_basis += f"; {statute}"
+            note = (
+                f"External review deadline: {ext_days} days from internal appeal denial. "
+                "External review clock starts from internal denial, not original denial."
+            )
+            if curated.get("notes"):
+                note += f" {curated['notes']}"
+            enrichment.state_deadlines = StateDeadlines(
+                internal_appeal_days=curated.get("internal_appeal_days", 180),
+                external_review_days=ext_days,
+                expedited_hours=curated.get("expedited_hours", 72),
+                regulation_basis=regulation_basis,
+                note=note,
+            )
 
         # Only include state-specific appeal rules if plan is state-regulated
         if regulation_type != RegulationType.erisa:

@@ -18,6 +18,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from tools.llm_client import is_llm_available
 from agents.output_agent import (
     generate_summary,
     generate_action_checklist,
@@ -62,9 +63,17 @@ class DeadlinesRequest(BaseModel):
 # Routes
 # ---------------------------------------------------------------------------
 
+_LLM_UNAVAILABLE = {
+    "status": "llm_unavailable",
+    "message": "LLM unavailable; deterministic outputs only. Set OPENAI_API_KEY or enable Ollama.",
+}
+
+
 @router.post("/summary")
 async def get_summary(req: OutputRequest) -> dict[str, Any]:
     """Generate plain-English denial summary."""
+    if not is_llm_available():
+        return _LLM_UNAVAILABLE
     try:
         analysis = {**req.analysis, "enrichment": req.enrichment}
         result = await generate_summary(req.claim_object, analysis)
@@ -77,6 +86,8 @@ async def get_summary(req: OutputRequest) -> dict[str, Any]:
 @router.post("/action-checklist")
 async def get_action_checklist(req: OutputRequest) -> dict[str, Any]:
     """Generate numbered action steps with why-expanders."""
+    if not is_llm_available():
+        return _LLM_UNAVAILABLE
     try:
         analysis = {**req.analysis, "enrichment": req.enrichment}
         result = await generate_action_checklist(req.claim_object, analysis)
@@ -89,6 +100,8 @@ async def get_action_checklist(req: OutputRequest) -> dict[str, Any]:
 @router.post("/appeal-letter")
 async def get_appeal_letter(req: AppealLetterRequest) -> dict[str, Any]:
     """Generate appeal letter, provider message, and insurer message (3 tabs)."""
+    if not is_llm_available():
+        return _LLM_UNAVAILABLE
     try:
         analysis = {**req.analysis, "enrichment": req.enrichment}
         result = await generate_appeal_letter(
@@ -105,6 +118,8 @@ async def get_appeal_letter(req: AppealLetterRequest) -> dict[str, Any]:
 @router.post("/provider-brief")
 async def get_provider_brief(req: OutputRequest) -> dict[str, Any]:
     """Generate one-page provider brief for treating physician."""
+    if not is_llm_available():
+        return _LLM_UNAVAILABLE
     try:
         analysis = {**req.analysis, "enrichment": req.enrichment}
         result = await generate_provider_brief(req.claim_object, analysis)

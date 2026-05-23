@@ -251,7 +251,8 @@ Example shape:
             key_points=["Check denial reason codes", "Contact your insurer", "Consider filing an appeal"],
         )
     try:
-        data = json.loads(raw)
+        repaired = _repair_truncated_json(raw)
+        data = json.loads(repaired)
         if not isinstance(data, dict):
             raise ValueError("LLM summary JSON must be an object")
         norm = _normalize_summary_payload(data)
@@ -530,7 +531,13 @@ async def generate_appeal_letter(
     analysis_dict: dict[str, Any],
     patient_info: dict[str, str] | None = None,
 ) -> AppealLetterOutput:
-    """Generate appeal letter, provider message, and insurer message."""
+    """
+    Generate appeal letter, provider message, and insurer message.
+    Uses 3 parallel LLM calls so each document is independent and
+    token budget per call is smaller (avoids truncation).
+    """
+    import asyncio
+
     context = _claim_context_summary(claim_dict, analysis_dict)
     patient = patient_info or {}
     patient_name = patient.get("name", "[PATIENT NAME]")
@@ -551,87 +558,114 @@ async def generate_appeal_letter(
     laws_text = "; ".join(
         f"{l.get('law', '')} {l.get('section', '')}" for l in applicable_laws
     ) or "applicable federal and state regulations"
+    claim_ref = ident.get("claim_reference_number", "Unknown")
+    root_cat = root_cause.get("category", "unknown")
+    root_reasoning = root_cause.get("reasoning", "")
 
-    prompt = f"""You are an expert insurance appeal attorney. Generate three formal documents for an insurance denial appeal.
+    # ── Prompt 1: formal appeal letter ──────────────────────────────────────
+    appeal_prompt = f"""You are an expert insurance appeal attorney. Write a formal appeal letter for an insurance denial.
 
 CLAIM INFORMATION:
 {context}
 
-PATIENT INFORMATION:
-Name: {patient_name}
-Address: {patient_address}
-Phone: {patient_phone}
-Email: {patient_email}
-
-APPEAL DEADLINE: {internal_deadline}
+PATIENT: {patient_name} | {patient_address} | {patient_phone}
 APPEALS ADDRESS: {appeal_address}
+APPEAL DEADLINE: {internal_deadline}
 APPLICABLE LAWS: {laws_text}
-APPEAL PROCESS: {json.dumps(appeal_process)}
+ROOT CAUSE: {root_cat} — {root_reasoning}
 
-Generate three documents in Markdown format:
-
-1. APPEAL LETTER — A formal letter to the insurance company appealing the denial. Must:
-   - Use formal letter format with date, addresses, subject line
-   - Cite specific regulations ({laws_text}) that support the appeal
-   - Reference the specific denial reason and why it is incorrect or reversible
-   - Reference the root cause: {root_cause.get('category', 'unknown')} — {root_cause.get('reasoning', '')}
-   - Request specific remedies (reconsideration, coverage, payment)
-   - Include a signature block for {patient_name}
-   - Tone: firm, professional, factual
-
-2. PROVIDER MESSAGE — A message from the patient to their provider's billing office. Must:
-   - Explain the denial and what action is needed from the provider
-   - Be conversational but professional
-   - Request specific documentation or action (e.g., retroactive prior auth, corrected billing code, letter of medical necessity)
-   - Be concise — 2-3 paragraphs
-
-3. INSURER MESSAGE — A shorter message to the insurer's member services line. Must:
-   - Request a status update or escalation
-   - Reference the claim and denial
-   - Be polite but persistent
-   - 1-2 paragraphs
-
-Return a JSON object with exactly:
-{{
-  "appeal_letter": "<full appeal letter in Markdown>",
-  "provider_message": "<provider message in Markdown>",
-  "insurer_message": "<insurer message in Markdown>",
-  "legal_citations": [
-    {{"law": "<law name>", "section": "<section>", "relevance": "<why cited>"}}
-  ]
-}}
+Write ONLY the formal appeal letter in Markdown. Requirements:
+- Formal letter format (date, addresses, subject line, salutation, body, signature)
+- Cite {laws_text} specifically in the body
+- Reference the denial reason and argue why it should be reversed
+- Request specific remedy (reconsideration and coverage)
+- Professional, firm, factual tone
+- Signature block for {patient_name}
 """
-    raw = await complete_llm(prompt, expect_json=True, priority=8)  # Defer until Action Plan outputs
-    if not raw:
-        fallback_letter = _fallback_appeal_letter(patient_name, patient_address, ident, laws_text, appeal_address, internal_deadline, root_cause)
-        return AppealLetterOutput(
-            appeal_letter=fallback_letter,
-            provider_message=f"Dear Billing Department,\n\nI am writing regarding claim {ident.get('claim_reference_number', 'Unknown')} which was denied. Please provide any documentation needed to support an appeal.\n\nThank you,\n{patient_name}",
-            insurer_message=f"Dear Member Services,\n\nI am writing to appeal the denial of claim {ident.get('claim_reference_number', 'Unknown')}. Please confirm receipt of this appeal.\n\nThank you,\n{patient_name}",
-            legal_citations=[],
+
+    # ── Prompt 2: provider billing message ──────────────────────────────────
+    provider_prompt = f"""You are an insurance patient advocate. Write a message FROM the patient TO their provider's billing office.
+
+CLAIM INFORMATION:
+{context}
+
+PATIENT: {patient_name}
+CLAIM REF: {claim_ref}
+ROOT CAUSE: {root_cat} — {root_reasoning}
+
+Write ONLY the provider billing message in Markdown. Requirements:
+- Conversational but professional (2-3 paragraphs)
+- Explain the denial and what action is needed from the provider/billing staff
+- Request specific action (e.g., retroactive prior auth, corrected code, letter of medical necessity)
+- Include a polite closing and patient name
+"""
+
+    # ── Prompt 3: insurer member services message ────────────────────────────
+    insurer_prompt = f"""You are an insurance patient advocate. Write a short message FROM the patient TO the insurer's member services.
+
+CLAIM INFORMATION:
+{context}
+
+PATIENT: {patient_name}
+CLAIM REF: {claim_ref}
+
+Write ONLY the member services message in Markdown. Requirements:
+- Short (1-2 paragraphs)
+- Reference the claim number and denial
+- Request status update or escalation to a supervisor
+- Polite but persistent tone
+- Patient signature
+"""
+
+    # Run all 3 in parallel
+    results = await asyncio.gather(
+        complete_llm(appeal_prompt, expect_json=False, priority=8),
+        complete_llm(provider_prompt, expect_json=False, priority=8),
+        complete_llm(insurer_prompt, expect_json=False, priority=8),
+        return_exceptions=True,
+    )
+    appeal_raw, provider_raw, insurer_raw = results
+
+    fallback_letter = _fallback_appeal_letter(
+        patient_name, patient_address, ident, laws_text, appeal_address, internal_deadline, root_cause
+    )
+
+    appeal_letter = (
+        appeal_raw
+        if isinstance(appeal_raw, str) and len(appeal_raw) > 100
+        else fallback_letter
+    )
+    if isinstance(appeal_raw, Exception):
+        logger.error("Appeal letter LLM call failed: %s", appeal_raw)
+
+    provider_message = (
+        provider_raw
+        if isinstance(provider_raw, str) and len(provider_raw) > 50
+        else (
+            f"Dear Billing Department,\n\nI am writing regarding claim {claim_ref} which was denied. "
+            f"Please provide any documentation needed to support an appeal.\n\nThank you,\n{patient_name}"
         )
-    try:
-        repaired = _repair_truncated_json(raw)
-        data = json.loads(repaired)
-        
-        # Validate that we have actual content, not just the prompt
-        appeal_text = data.get('appeal_letter', '')
-        if isinstance(appeal_text, str) and len(appeal_text) > 100:
-            return AppealLetterOutput(**data)
-        else:
-            logger.warning("Appeal letter content too short or missing, using fallback")
-            raise ValueError("Invalid appeal letter content")
-            
-    except Exception as e:
-        logger.error(f"Output Agent: failed to parse appeal letter JSON: {e}")
-        # Use fallback instead of returning raw (which might be malformed)
-        fallback_letter = _fallback_appeal_letter(patient_name, patient_address, ident, laws_text, appeal_address, internal_deadline, root_cause)
-        return AppealLetterOutput(
-            appeal_letter=fallback_letter,
-            provider_message=f"Dear Billing Department,\n\nI am writing regarding claim {ident.get('claim_reference_number', 'Unknown')} which was denied. Please provide any documentation needed to support an appeal.\n\nThank you,\n{patient_name}",
-            insurer_message=f"Dear Member Services,\n\nI am writing to appeal the denial of claim {ident.get('claim_reference_number', 'Unknown')}. Please confirm receipt of this appeal.\n\nThank you,\n{patient_name}",
-            legal_citations=[],
+    )
+    if isinstance(provider_raw, Exception):
+        logger.error("Provider message LLM call failed: %s", provider_raw)
+
+    insurer_message = (
+        insurer_raw
+        if isinstance(insurer_raw, str) and len(insurer_raw) > 50
+        else (
+            f"Dear Member Services,\n\nI am writing to appeal the denial of claim {claim_ref}. "
+            f"Please confirm receipt of this appeal and escalate if needed.\n\nThank you,\n{patient_name}"
         )
+    )
+    if isinstance(insurer_raw, Exception):
+        logger.error("Insurer message LLM call failed: %s", insurer_raw)
+
+    return AppealLetterOutput(
+        appeal_letter=appeal_letter,
+        provider_message=provider_message,
+        insurer_message=insurer_message,
+        legal_citations=[],
+    )
 
 
 async def generate_provider_brief(
@@ -1075,8 +1109,8 @@ async def generate_routing_card(
     if external_review_url:
         complaint_links.append({"name": "External Review Request", "url": external_review_url})
 
-    # Generate LLM-formatted markdown card
-    formatted_card = await _generate_routing_card_markdown(
+    # Build deterministic routing card (no LLM call needed)
+    formatted_card = _generate_routing_card_markdown(
         routing=routing,
         routing_reason=routing_reason,
         primary=primary,
@@ -1095,7 +1129,7 @@ async def generate_routing_card(
     )
 
 
-async def _generate_routing_card_markdown(
+def _generate_routing_card_markdown(
     routing: str,
     routing_reason: str,
     primary: RoutingRoute,
@@ -1103,112 +1137,61 @@ async def _generate_routing_card_markdown(
     state: str,
     regulation_type: str,
 ) -> str:
-    """Generate a clean patient-readable markdown routing card using the configured LLM."""
-    route_label = {
-        "erisa_federal": "Federal ERISA (DOL)",
-        "state_doi": f"{state} Department of Insurance",
-        "medicaid_state": f"{state} Medicaid",
-    }.get(routing, routing)
+    """Build a deterministic patient-readable routing card in Markdown."""
+    lines = [
+        "## Your Regulatory Routing Card",
+        "",
+        f"**Your Plan Is Regulated By:** {primary.route_name}",
+        "",
+        f"**Why:** {routing_reason}",
+        "",
+        "---",
+        "",
+        f"### Primary Appeal Route: {primary.route_name}",
+        "",
+        f"**Legal Authority:** {primary.legal_basis}",
+        "",
+        "**Contact:**",
+        f"- **Phone:** {primary.contact.phone or 'See your insurance card'}",
+        f"- **Website:** {primary.contact.website or 'N/A'}",
+        f"- **File a Complaint:** {primary.contact.complaint_url or 'N/A'}",
+    ]
+    if primary.contact.external_review_url:
+        lines.append(f"- **External Review:** {primary.contact.external_review_url}")
 
-    secondary_block = ""
+    lines += ["", "**Your Appeal Process:**"]
+    for i, step in enumerate(primary.process_steps, 1):
+        lines.append(f"{i}. {step}")
+
+    if primary.notes:
+        lines += ["", f"**Important Note:** {primary.notes}"]
+
     if secondary:
-        secondary_block = f"""
-### Secondary Route: {secondary.route_name}
-**Legal Basis:** {secondary.legal_basis}
-
-**Contact:**
-- Name: {secondary.contact.name or 'N/A'}
-- Phone: {secondary.contact.phone or 'N/A'}
-- Website: {secondary.contact.website or 'N/A'}
-
-**Notes:** {secondary.notes}
-"""
-
-    prompt = f"""You are an insurance patient advocate. Generate a clean, easy-to-read regulatory routing card for a patient in Markdown format.
-
-ROUTING DECISION: {route_label}
-ROUTING REASON: {routing_reason}
-REGULATION TYPE: {regulation_type}
-STATE: {state}
-
-PRIMARY CONTACT:
-- Organization: {primary.route_name}
-- Legal Basis: {primary.legal_basis}
-- Phone: {primary.contact.phone or 'Call insurer on your insurance card'}
-- Website: {primary.contact.website or 'N/A'}
-- Complaint URL: {primary.contact.complaint_url or 'N/A'}
-- External Review URL: {primary.contact.external_review_url or 'N/A'}
-
-PROCESS STEPS:
-{chr(10).join(f'- {s}' for s in primary.process_steps)}
-
-PRIMARY NOTES: {primary.notes}
-{secondary_block}
-
-Generate a routing card in this exact Markdown structure (fill in the details):
-
-## 📋 Your Regulatory Routing Card
-
-**Regulation Type:** [plain-English description of plan type]
-**Who Oversees Your Plan:** [primary regulator name]
-**Why:** [1-2 sentence plain-English explanation of why this routing applies]
-
----
-
-### 🏛️ Primary Appeal Route: [route name]
-
-**Legal Authority:** [cite the law]
-
-**Contact:**
-| | |
-|---|---|
-| **Phone** | [phone] |
-| **Website** | [website] |
-| **File a Complaint** | [complaint URL] |
-
-**Your Appeal Process:**
-1. [step 1]
-2. [step 2]
-...
-
-**Important Note:** [plain-English explanation of any gotchas or key facts]
-
-[if secondary route exists, include a secondary section]
-
----
-
-### ℹ️ Key Rights Summary
-- [bullet: right 1]
-- [bullet: right 2]
-- [bullet: right 3]
-
-*This routing card is based on your extracted plan information. Verify your plan type with your employer HR department or insurer if uncertain.*
-
-Keep it concise, clear, and actionable. Use plain English — no jargon.
-"""
-    raw = await complete_llm(prompt, expect_json=False, priority=5)
-    if not raw:
-        # Return a deterministic fallback card
-        lines = [
-            f"## Your Regulatory Routing Card",
-            f"",
-            f"**Your Plan Is Regulated By:** {primary.route_name}",
-            f"",
-            f"**Why:** {routing_reason}",
-            f"",
-            f"### Contact",
-            f"- **Phone:** {primary.contact.phone or 'See your insurance card'}",
-            f"- **Website:** {primary.contact.website or 'N/A'}",
-            f"- **Complaint Portal:** {primary.contact.complaint_url or 'N/A'}",
-            f"",
-            f"### Your Appeal Steps",
+        lines += [
+            "",
+            "---",
+            "",
+            f"### Also Available: {secondary.route_name}",
+            "",
+            f"**Legal Basis:** {secondary.legal_basis}",
+            "",
+            "**Contact:**",
+            f"- **Phone:** {secondary.contact.phone or 'N/A'}",
+            f"- **Website:** {secondary.contact.website or 'N/A'}",
         ]
-        for i, step in enumerate(primary.process_steps, 1):
-            lines.append(f"{i}. {step}")
-        if primary.notes:
-            lines += ["", f"**Note:** {primary.notes}"]
-        return "\n".join(lines)
-    return raw
+        for step in secondary.process_steps:
+            lines.append(f"- {step}")
+        if secondary.notes:
+            lines += ["", f"**Note:** {secondary.notes}"]
+
+    lines += [
+        "",
+        "---",
+        "",
+        "*This routing card is based on your extracted plan information. "
+        "Verify your plan type with your employer HR department or insurer if uncertain.*",
+    ]
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
