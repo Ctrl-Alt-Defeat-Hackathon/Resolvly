@@ -29,6 +29,8 @@ class LegalCitation(BaseModel):
     section: str
     relevance: str
     url: str = ""
+    quoted_text: str = ""    # verbatim 1-2 sentence excerpt for appeal letter citations
+    last_verified: str = ""  # ISO date string — when the cached text was last checked against eCFR
 
 
 class RegulationEnrichment(BaseModel):
@@ -45,6 +47,30 @@ class RegulationEnrichment(BaseModel):
     coverage_url: str = ""
     legal_citations: list[dict] = []
     raw_texts: list[str] = []
+
+
+# HCPCS codes that indicate air ambulance (trigger NSA IDR process)
+_NSA_AIR_AMBULANCE_HCPCS = frozenset({"A0430", "A0431"})
+# Place of service codes for emergency department
+_NSA_EMERGENCY_POS = frozenset({"23"})
+
+
+def _is_nsa_eligible(claim: ClaimObject) -> bool:
+    """
+    Return True when the No Surprises Act IDR process applies instead of standard
+    internal appeal.  Triggers when root_cause is network_coverage AND the claim
+    involves an emergency (POS 23) or air ambulance, or is explicitly out-of-network.
+    """
+    if claim.derived.root_cause_category != RootCauseCategory.network_coverage:
+        return False
+    pos = claim.service_billing.place_of_service_code or ""
+    hcpcs = set(claim.service_billing.hcpcs_codes)
+    network = (claim.patient_provider.network_status or "").lower()
+    return (
+        pos in _NSA_EMERGENCY_POS
+        or bool(hcpcs & _NSA_AIR_AMBULANCE_HCPCS)
+        or "out-of-network" in network
+    )
 
 
 async def run_regulation_agent(claim: ClaimObject) -> RegulationEnrichment:
@@ -67,25 +93,74 @@ async def run_regulation_agent(claim: ClaimObject) -> RegulationEnrichment:
     if root_cause == RootCauseCategory.prior_authorization:
         denial_type = "prior_authorization"
 
+    # NSA check — routes entire appeal to IDR process, not standard internal appeal
+    nsa_eligible = _is_nsa_eligible(claim)
+    if nsa_eligible:
+        logger.info("Regulation Agent: No Surprises Act IDR process applies (network/emergency claim)")
+        enrichment.applicable_laws.append(LegalCitation(
+            law="No Surprises Act",
+            section="45 CFR § 149.510",
+            relevance=(
+                "Federal Independent Dispute Resolution (IDR) process applies to "
+                "out-of-network emergency and air ambulance claims. Standard internal "
+                "appeal may still be filed but the IDR process runs in parallel."
+            ),
+            url="https://www.cms.gov/nosurprises",
+            quoted_text=(
+                "Under the No Surprises Act, patients are protected from surprise "
+                "medical bills for emergency services and certain non-emergency services "
+                "at in-network facilities provided by out-of-network providers."
+            ),
+            last_verified="2025-01-01",
+        ))
+        enrichment.appeal_process = [
+            "You are protected by the No Surprises Act — your cost-sharing is limited to in-network amounts.",
+            "Submit a dispute to the Federal Independent Dispute Resolution (IDR) portal at cms.gov/nosurprises.",
+            "The IDR process must be initiated within 4 business days after the 30-day open negotiation period expires.",
+            "You may still file a standard internal appeal with your insurer in parallel.",
+            "File a complaint with the No Surprises Help Desk at 1-800-985-3059 if the insurer violates NSA protections.",
+        ]
+        enrichment.external_review_available = True
+
     # Run regulation lookups in parallel
     tasks = []
 
     if regulation_type == RegulationType.erisa:
         tasks.append(("erisa", search_erisa(plan_type="erisa", denial_type=denial_type)))
-        tasks.append(("ecfr_erisa", search_ecfr(
+        tasks.append(("ecfr_erisa_503", search_ecfr(
             query="ERISA claims procedure appeal 503",
             cfr_section="29 CFR 2560.503-1",
         )))
+        # ACA labor-side parallel rule (applies to ERISA plans subject to ACA)
+        tasks.append(("ecfr_erisa_2719", search_ecfr(
+            query="ACA internal external claims review ERISA group health plans",
+            cfr_section="29 CFR 2590.715-2719",
+        )))
     elif regulation_type in (RegulationType.state, RegulationType.unknown):
         tasks.append(("aca", search_aca_provisions(plan_type="aca", denial_type=denial_type)))
-        tasks.append(("ecfr_aca", search_ecfr(
+        tasks.append(("ecfr_aca_147", search_ecfr(
             query="ACA internal external review 2719",
             cfr_section="45 CFR 147.136",
         )))
+        # ACA tax-side parallel rule
+        tasks.append(("ecfr_aca_tax", search_ecfr(
+            query="ACA internal external review group health plans tax",
+            cfr_section="26 CFR 54.9815-2719",
+        )))
+        # Essential health benefits (relevant to medical necessity denials)
+        tasks.append(("ecfr_ehb", search_ecfr(
+            query="essential health benefits coverage requirements",
+            cfr_section="45 CFR 156.122",
+        )))
     elif regulation_type == RegulationType.medicaid:
-        tasks.append(("ecfr_medicaid", search_ecfr(
+        tasks.append(("ecfr_medicaid_431", search_ecfr(
             query="Medicaid fair hearing adverse action",
             cfr_section="42 CFR 431.220",
+        )))
+        # Medicaid managed care appeals (distinct from fair hearing)
+        tasks.append(("ecfr_medicaid_438", search_ecfr(
+            query="Medicaid managed care organization appeal grievance",
+            cfr_section="42 CFR 438.402",
         )))
 
     # Always look up CMS coverage if medical necessity denial
@@ -137,7 +212,11 @@ async def run_regulation_agent(claim: ClaimObject) -> RegulationEnrichment:
             for citation in aca.legal_citations:
                 enrichment.applicable_laws.append(LegalCitation(**citation))
 
-        elif name in ("ecfr_erisa", "ecfr_aca", "ecfr_medicaid"):
+        elif name in (
+            "ecfr_erisa_503", "ecfr_erisa_2719",
+            "ecfr_aca_147", "ecfr_aca_tax", "ecfr_ehb",
+            "ecfr_medicaid_431", "ecfr_medicaid_438",
+        ):
             if result.found and result.excerpt:
                 enrichment.raw_texts.append(result.excerpt)
                 enrichment.applicable_laws.append(LegalCitation(
@@ -145,16 +224,27 @@ async def run_regulation_agent(claim: ClaimObject) -> RegulationEnrichment:
                     section=result.cfr_reference,
                     relevance=result.title,
                     url=result.url,
+                    quoted_text=result.excerpt[:500] if result.excerpt else "",
                 ))
-            # Medicaid-specific defaults
-            if name == "ecfr_medicaid":
+            # Medicaid managed care defaults (42 CFR § 438.402)
+            if name == "ecfr_medicaid_438" and result.found:
+                enrichment.applicable_laws.append(LegalCitation(
+                    law="42 CFR § 438.402",
+                    section="42 CFR § 438.402",
+                    relevance="Medicaid managed care organization (MCO) appeal and grievance procedures — precede state fair hearing",
+                    url=result.url,
+                    last_verified="2025-01-01",
+                ))
+            # Medicaid fair hearing defaults (42 CFR § 431.220)
+            if name == "ecfr_medicaid_431":
                 enrichment.internal_appeal_deadline_days = 90
                 enrichment.appeal_process = [
-                    "Request a Medicaid fair hearing within 90 days of the denial notice",
-                    "Submit hearing request to your state Medicaid agency",
-                    "Benefits must continue pending hearing if requested within 10 days of notice",
-                    "Hearing must be held within 90 days of your request",
-                    "You may bring legal representation or an authorized representative",
+                    "If enrolled in Medicaid managed care (MCO/HMO), first file an internal appeal with your MCO (deadline: 60 days from denial).",
+                    "If MCO appeal is denied, request a Medicaid fair hearing from your state Medicaid agency within 90 days of the denial.",
+                    "Submit hearing request to your state Medicaid agency in writing.",
+                    "Benefits must continue pending hearing if requested within 10 days of notice.",
+                    "Hearing must be held within 90 days of your request.",
+                    "You may bring legal representation or an authorized representative.",
                 ]
 
         elif name == "cms_coverage":

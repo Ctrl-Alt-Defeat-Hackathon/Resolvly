@@ -76,13 +76,24 @@ _CARC_RESPONSIBLE_PARTY: dict[str, str] = {
 }
 
 
-def _classify_by_carc(carc_codes: list[str]) -> RootCauseResult | None:
+def _classify_by_carc(
+    carc_codes: list[str],
+    carc_codes_with_group: dict[str, str] | None = None,
+) -> RootCauseResult | None:
     """
     Attempt deterministic classification from CARC codes.
     Returns None if codes are absent or ambiguous.
+
+    CO-prefixed codes (Contractual Obligation — insurer-side denials) receive a +1
+    bonus on top of the base score because they carry more certain attribution.
+    PR-prefixed codes (Patient Responsibility) do not receive the bonus.
     """
     if not carc_codes:
         return None
+
+    co_group: frozenset[str] = frozenset()
+    if carc_codes_with_group:
+        co_group = frozenset(k for k, v in carc_codes_with_group.items() if v == "CO")
 
     # Normalize: strip group prefix (CO-, PR-, OA-)
     normalized: list[str] = []
@@ -111,23 +122,24 @@ def _classify_by_carc(carc_codes: list[str]) -> RootCauseResult | None:
 
     for code in normalized:
         cat = None
+        co_bonus = 1 if code in co_group else 0
         if code in _CARC_PRIOR_AUTH:
-            scores["prior_authorization"] += 3
+            scores["prior_authorization"] += 3 + co_bonus
             cat = "prior_authorization"
         elif code in _CARC_MEDICAL_NECESSITY:
-            scores["medical_necessity"] += 3
+            scores["medical_necessity"] += 3 + co_bonus
             cat = "medical_necessity"
         elif code in _CARC_CODING_BILLING:
-            scores["coding_billing_error"] += 2
+            scores["coding_billing_error"] += 2 + co_bonus
             cat = "coding_billing_error"
         elif code in _CARC_NETWORK_COVERAGE:
-            scores["network_coverage"] += 2
+            scores["network_coverage"] += 2 + co_bonus
             cat = "network_coverage"
         elif code in _CARC_ELIGIBILITY:
-            scores["eligibility_enrollment"] += 2
+            scores["eligibility_enrollment"] += 2 + co_bonus
             cat = "eligibility_enrollment"
         elif code in _CARC_PROCEDURAL:
-            scores["procedural_administrative"] += 1
+            scores["procedural_administrative"] += 1 + co_bonus
             cat = "procedural_administrative"
 
         if cat and first_code_category is None:
@@ -280,9 +292,12 @@ async def classify_root_cause(claim: ClaimObject) -> RootCauseResult:
     1. Try deterministic CARC rule classification first (fast, high confidence)
     2. If confidence < 0.80 or no CARC codes, supplement with LLM analysis
     """
-    rules_result = _classify_by_carc(claim.denial_reason.carc_codes)
+    rules_result = _classify_by_carc(
+        claim.denial_reason.carc_codes,
+        claim.denial_reason.carc_codes_with_group,
+    )
 
-    if rules_result and rules_result.confidence >= 0.85:
+    if rules_result and rules_result.confidence >= 0.75:
         logger.info(f"Root cause classified by rules: {rules_result.category} ({rules_result.confidence:.2f})")
         return rules_result
 

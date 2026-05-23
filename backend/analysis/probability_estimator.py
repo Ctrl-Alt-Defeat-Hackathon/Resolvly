@@ -4,11 +4,13 @@ Approval Probability Estimator
 Rules-based engine that estimates the probability of a successful appeal
 based on root cause category, CARC codes, denial completeness, and other factors.
 
-Based on CMS appeals data and published denial overturn rates.
+Uses logistic combination: final_p = sigmoid(logit(base_rate) + Σ logit_weights)
+so adjustments compose correctly rather than being clamped at arbitrary linear bounds.
 """
 from __future__ import annotations
 
 import logging
+import math
 
 from pydantic import BaseModel
 
@@ -21,8 +23,17 @@ logger = logging.getLogger(__name__)
 class ProbabilityResult(BaseModel):
     score: float          # 0.0 – 1.0
     reasoning: str
-    factors: list[str]    # positive/negative factors with + or - prefix
-    source: str = "Rules engine based on CMS appeals data and published overturn rates"
+    factors: list[str]    # display factors — items with +/- prefix affect score; others are informational
+    source: str = "Rules engine based on published appeals overturn statistics; individual results vary."
+
+
+def _logit(p: float) -> float:
+    p = max(0.01, min(0.99, p))
+    return math.log(p / (1 - p))
+
+
+def _sigmoid(x: float) -> float:
+    return 1.0 / (1.0 + math.exp(-x))
 
 
 # Base overturn rates by root cause (from CMS/KFF appeals data)
@@ -72,61 +83,67 @@ def estimate_probability(
     denial_completeness_score: float = 1.0,
 ) -> ProbabilityResult:
     """
-    Estimate appeal approval probability.
+    Estimate appeal approval probability using logistic combination.
+
+    Score adjustments are applied in logit space so they compose correctly;
+    display-only factors (no numeric weight) are informational only.
     """
-    base_score = _BASE_RATES.get(root_cause.category, 0.50)
+    base_rate = _BASE_RATES.get(root_cause.category, 0.50)
     base_reasoning = _BASE_REASONING.get(root_cause.category, "Estimated based on category averages.")
-    factors: list[str] = []
-    adjustment = 0.0
+
+    factors: list[str] = []          # shown to user
+    logit_weights: list[float] = []  # score adjustments (logit scale)
 
     # Factor: Responsible party
     if root_cause.responsible_party == "provider_billing_office":
-        factors.append("+Provider error (high overturn rate when provider corrects and resubmits)")
-        adjustment += 0.05
+        factors.append("+Provider billing error — high overturn rate when provider corrects and resubmits")
+        logit_weights.append(0.30)
     elif root_cause.responsible_party == "insurer":
         factors.append("+Insurer determination can be challenged with clinical evidence")
+        # No logit adjustment — neutral signal, already baked into base rate
     elif root_cause.responsible_party == "patient":
         factors.append("-Patient responsibility denials (deductible, OOP max) are rarely overturned")
-        adjustment -= 0.15
+        logit_weights.append(-0.70)
 
-    # Factor: Denial completeness (deficient notice)
+    # Factor: Denial completeness
     if denial_completeness_score < 0.75:
-        factors.append("+Denial letter is procedurally deficient — this strengthens appeal grounds")
-        adjustment += 0.08
+        factors.append("+Denial letter is procedurally deficient — strengthens appeal grounds")
+        logit_weights.append(0.40)
     elif denial_completeness_score > 0.90:
         factors.append("-Denial letter is well-documented — insurer appears confident in decision")
-        adjustment -= 0.03
+        logit_weights.append(-0.15)
 
-    # Factor: Prior appeal filed
-    # We can't know this, but we note it
-    factors.append("-No prior appeal filed yet (each appeal level increases probability)")
+    # Display-only: no prior appeal (informational — no score effect, since we can't know)
+    factors.append("No prior appeal filed yet — filing an appeal is required before external review")
 
     # Factor: Regulation type
     regulation_type = claim.identification.erisa_or_state_regulated
     if regulation_type == RegulationType.state:
         factors.append("+External review by independent IRO available (binding on insurer)")
-        adjustment += 0.05
+        logit_weights.append(0.25)
     elif regulation_type == RegulationType.erisa:
-        factors.append("~ERISA plan: no external review for self-funded; civil action under § 502(a) as last resort")
+        factors.append("~ERISA plan: no state external review; civil action under § 502(a) is last resort")
 
-    # Factor: Expedited review
-    if claim.appeal_rights.expedited_review_available:
-        factors.append("+Expedited review available — faster resolution possible")
+    # Factor: Expedited review available
+    if claim.appeal_rights.expedited_review_available is True:
+        factors.append("+Expedited review available — faster resolution pathway exists")
 
-    # Factor: Prior auth with clinical docs available
+    # Factor: Prior auth — retroactive authorization possible
     if root_cause.category == RootCauseCategory.prior_authorization:
         if claim.denial_reason.prior_auth_status == "required_not_obtained":
-            factors.append("+Provider can request retroactive authorization with clinical documentation")
+            factors.append("+Provider can request retroactive authorization with supporting clinical documentation")
+            logit_weights.append(0.20)
 
-    # Factor: Billed amount
+    # Factor: Financial stakes
     denied = claim.financial.denied_amount or 0
-    if denied > 5000:
-        factors.append("+High denied amount gives provider/patient strong financial incentive to pursue appeal")
+    if denied > 5_000:
+        factors.append("+High denied amount — strong financial incentive for provider to support appeal")
     elif denied < 500:
-        factors.append("-Small denied amount may not be worth full appeal process for some patients")
+        factors.append("-Small denied amount — weigh appeal effort against potential recovery")
 
-    # Clamp final score
-    final_score = max(0.05, min(0.97, base_score + adjustment))
+    # Logistic combination: sigmoid(logit(base_rate) + Σ weights)
+    final_logit = _logit(base_rate) + sum(logit_weights)
+    final_score = max(0.05, min(0.97, _sigmoid(final_logit)))
 
     return ProbabilityResult(
         score=round(final_score, 2),

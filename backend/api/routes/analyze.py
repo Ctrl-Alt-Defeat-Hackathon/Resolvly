@@ -20,6 +20,7 @@ from slowapi.util import get_remote_address
 
 from extraction.schema import ClaimObject, PlanContext
 from agents.orchestrator import run_orchestrator, stream_orchestrator
+from api.errors import check_blocking_fields
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -40,6 +41,9 @@ class AnalyzeResponse(BaseModel):
     analysis: dict[str, Any]
     sources: list[dict[str, Any]]
     claim_object: dict[str, Any]
+    errors: list[str] = []
+    agent_status: dict[str, str] = {}
+    llm_available: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +87,14 @@ async def analyze_claim(request: Request, body: AnalyzeRequest) -> AnalyzeRespon
     claim = _parse_claim(body.claim_object)
     plan_context = _parse_plan_context(body.plan_context)
 
+    # Apply plan context before gap check so wizard-provided regulation_type is considered
+    from agents.orchestrator import _apply_plan_context
+    claim = _apply_plan_context(claim, plan_context)
+
+    gap = check_blocking_fields(claim)
+    if gap is not None and not gap.can_proceed_partial:
+        raise HTTPException(status_code=422, detail=gap.model_dump())
+
     try:
         result = await run_orchestrator(claim, plan_context)
     except Exception as e:
@@ -94,6 +106,9 @@ async def analyze_claim(request: Request, body: AnalyzeRequest) -> AnalyzeRespon
         analysis=result.analysis,
         sources=result.sources,
         claim_object=result.claim_object,
+        errors=result.errors,
+        agent_status=result.agent_status,
+        llm_available=result.llm_available,
     )
 
 
@@ -121,6 +136,13 @@ async def analyze_claim_stream(request: Request, body: AnalyzeRequest):
     """
     claim = _parse_claim(body.claim_object)
     plan_context = _parse_plan_context(body.plan_context)
+
+    from agents.orchestrator import _apply_plan_context
+    claim = _apply_plan_context(claim, plan_context)
+
+    gap = check_blocking_fields(claim)
+    if gap is not None and not gap.can_proceed_partial:
+        raise HTTPException(status_code=422, detail=gap.model_dump())
 
     async def event_generator():
         try:

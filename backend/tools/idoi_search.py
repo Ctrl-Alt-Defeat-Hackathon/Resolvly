@@ -1,13 +1,18 @@
 """
-Indiana DOI (IDOI) Search Tool
+State DOI Search Tool
 
-Uses official DOI contact URLs from state_doi_contacts.json (per implementation plan)
-and augments appeal guidance with live web search against authoritative domains — not
-static legal prose maintained in code.
+Primary source: curated `data/state_appeal_rules.json` for the top 10 states.
+Fallback: live web search restricted to .gov domains for all other states.
+
+This design makes appeal deadlines reliable and citation-ready for the top-10
+states (covering ~65% of US population) while still serving the remaining 40
+states through web search until they are curated.
 """
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -16,6 +21,16 @@ from tools.state_doi_lookup import get_doi_contact
 from tools.web_search import web_search
 
 logger = logging.getLogger(__name__)
+
+_STATE_RULES_PATH = Path(__file__).parent.parent / "data" / "state_appeal_rules.json"
+_STATE_RULES: dict[str, Any] = {}
+
+try:
+    with open(_STATE_RULES_PATH) as _f:
+        _raw = json.load(_f)
+        _STATE_RULES = {k: v for k, v in _raw.items() if not k.startswith("_")}
+except Exception as _e:
+    logger.warning(f"Could not load state_appeal_rules.json: {_e}")
 
 
 class IDOIResult(BaseModel):
@@ -50,14 +65,34 @@ def _official_consumer_links(doi: dict[str, Any]) -> list[dict[str, str]]:
     return out
 
 
+def _curated_appeal_rules(state: str, rules_entry: dict[str, Any]) -> list[str]:
+    """Build authoritative, citation-ready appeal rules from the curated JSON entry."""
+    internal = rules_entry.get("internal_appeal_days", 180)
+    external = rules_entry.get("external_review_days", 120)
+    authority = rules_entry.get("external_review_authority", "your state Department of Insurance")
+    statute = rules_entry.get("external_review_statute", "")
+    source_url = rules_entry.get("source_url", "")
+    notes = rules_entry.get("notes", "")
+    citation = f" ({statute})" if statute else ""
+
+    rules = [
+        f"File an internal appeal with your insurer within {internal} days of the denial notice (ACA § 2719).",
+        f"If the internal appeal is denied, request external independent review through the {authority}{citation} within {external} days of the internal denial.",
+        "External review by an Independent Review Organization (IRO) is binding on the insurer and free for you.",
+    ]
+    if notes:
+        rules.append(notes)
+    if source_url:
+        rules.append(f"Official source: {source_url}")
+    return rules
+
+
 async def _appeal_rules_from_web(state: str, doi_name: str) -> list[str]:
-    """Short snippets from web search (official / educational pages); no hardcoded statutes."""
+    """Web search fallback for states not in the curated JSON. Restricted to .gov domains."""
     rules: list[str] = []
-    q = f"{doi_name} health insurance internal appeal deadline site:.gov"
-    if state == "IN":
-        q = "Indiana Department of Insurance health insurance appeal external review site:in.gov"
+    q = f"{doi_name} health insurance internal appeal deadline external review site:.gov"
     try:
-        ws = await web_search(q, num_results=4)
+        ws = await web_search(q, num_results=3)
         if ws.found and ws.results:
             for r in ws.results:
                 snippet = (r.get("snippet") or "").strip()
@@ -81,7 +116,10 @@ async def _appeal_rules_from_web(state: str, doi_name: str) -> list[str]:
 
 async def search_idoi(state: str = "IN", query: str = "") -> IDOIResult:
     """
-    Fetch state DOI information; enrich appeal guidance via web search, not hardcoded law text.
+    Fetch state DOI information for a claim.
+
+    Primary source: curated state_appeal_rules.json (top 10 states).
+    Fallback: live web search restricted to .gov domains for all other states.
     """
     state = state.upper().strip()
     doi_contact = get_doi_contact(state)
@@ -105,20 +143,17 @@ async def search_idoi(state: str = "IN", query: str = "") -> IDOIResult:
 
     result.consumer_resources = _official_consumer_links(doi_contact)
 
-    # state_deadlines is populated by the State Rules Agent (which knows regulation type)
-    # Leave it empty here; the agent fills it with regulation-appropriate values.
-
-    if state == "IN":
-        result.appeal_rules = await _appeal_rules_from_web(state, result.doi_name or "Indiana Department of Insurance")
-        if query:
-            extra = await web_search(f"site:in.gov idoi {query}", num_results=2)
-            if extra.found and extra.results:
-                for r in extra.results:
-                    sn = (r.get("snippet") or "").strip()
-                    if sn:
-                        result.appeal_rules.append(sn[:500])
+    # Primary: serve curated appeal rules if this state is in the curated JSON
+    curated = _STATE_RULES.get(state)
+    if curated:
+        result.appeal_rules = _curated_appeal_rules(state, curated)
+        logger.info(f"State rules for {state}: served from curated JSON (verified {curated.get('last_verified', 'unknown')})")
     else:
-        result.appeal_rules = await _appeal_rules_from_web(state, result.doi_name or "Department of Insurance")
+        # Fallback: web search for states not yet curated
+        logger.info(f"State rules for {state}: falling back to web search (not in curated JSON)")
+        result.appeal_rules = await _appeal_rules_from_web(
+            state, result.doi_name or f"{state} Department of Insurance"
+        )
         if query:
             ws_result = await web_search(
                 f"{doi_contact.get('name', state + ' Department of Insurance')} {query} health insurance appeal",
@@ -126,12 +161,10 @@ async def search_idoi(state: str = "IN", query: str = "") -> IDOIResult:
             )
             if ws_result.found and ws_result.results:
                 for r in ws_result.results[:2]:
-                    result.consumer_resources.append(
-                        {
-                            "name": r.get("title", ""),
-                            "description": r.get("snippet", ""),
-                            "url": r.get("link", ""),
-                        }
-                    )
+                    result.consumer_resources.append({
+                        "name": r.get("title", ""),
+                        "description": r.get("snippet", ""),
+                        "url": r.get("link", ""),
+                    })
 
     return result

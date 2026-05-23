@@ -42,6 +42,13 @@ def _is_local_environment() -> bool:
     return settings.debug or settings.ollama_enabled
 
 
+# Per-model cooldown: maps model name → asyncio.Task resetting the cooldown.
+# When a model gets a 429, only that model is paused, not all models.
+_model_cooldown: dict[str, bool] = {}
+_model_cooldown_lock = asyncio.Lock()
+_model_cooldown_tasks: dict[str, asyncio.Task] = {}
+
+# Legacy global flag kept for backward-compat (reflects any model being rate-limited)
 _openai_rate_limited = False
 _openai_rate_limit_lock = asyncio.Lock()
 _openai_rate_limit_reset_task: asyncio.Task | None = None
@@ -66,10 +73,18 @@ async def _reset_openai_rate_limit_after_delay(delay_seconds: float = 120.0):
         logger.info("OpenAI rate limit cooldown complete — re-enabling OpenAI API")
 
 
-async def _execute_llm_call(prompt: str, expect_json: bool, system_instruction: str | None) -> str:
+async def _execute_llm_call(
+    prompt: str,
+    expect_json: bool,
+    system_instruction: str | None,
+    response_schema: dict | None = None,
+) -> str:
     """
     Execute a single LLM call with rate limiting and fallback.
     Called exclusively by _llm_worker_loop — never directly.
+
+    response_schema: when provided, uses OpenAI json_schema mode (Structured Outputs)
+                     instead of json_object mode. Pass a standard JSON Schema dict.
     """
     global _last_request_time, _openai_rate_limited
 
@@ -93,7 +108,8 @@ async def _execute_llm_call(prompt: str, expect_json: bool, system_instruction: 
 
     if settings.openai_api_key and not should_skip_openai:
         response, should_fallback = await _complete_openai(
-            prompt, expect_json, system_instruction, 0, skip_retries
+            prompt, expect_json, system_instruction, 0, skip_retries,
+            response_schema=response_schema,
         )
         if response:
             return response
@@ -119,9 +135,11 @@ async def _llm_worker_loop():
     """Single worker that dequeues and processes LLM requests in priority order."""
     while True:
         item = await _llm_request_queue.get()
-        _priority, _seq, prompt, expect_json, system_instruction, future = item
+        _priority, _seq, prompt, expect_json, system_instruction, response_schema, future = item
         try:
-            result = await _execute_llm_call(prompt, expect_json, system_instruction)
+            result = await _execute_llm_call(
+                prompt, expect_json, system_instruction, response_schema
+            )
             if not future.done():
                 future.set_result(result)
         except Exception as e:
@@ -179,12 +197,37 @@ def _extract_json_block(text: str) -> str:
     return obj_candidate or arr_candidate or t
 
 
+async def _reset_model_cooldown_after_delay(model: str, delay_seconds: float):
+    global _openai_rate_limited
+    await asyncio.sleep(delay_seconds)
+    async with _model_cooldown_lock:
+        _model_cooldown[model] = False
+        # Update global flag: still rate-limited only if some other model is cooling down
+        if not any(_model_cooldown.values()):
+            async with _openai_rate_limit_lock:
+                _openai_rate_limited = False
+    logger.info(f"Rate limit cooldown complete for model '{model}'")
+
+
+def _parse_retry_after(headers: httpx.Headers) -> float:
+    """Parse Retry-After header (seconds or HTTP-date). Returns backoff seconds."""
+    value = headers.get("retry-after", "")
+    if not value:
+        return 0.0
+    try:
+        return max(1.0, float(value))
+    except ValueError:
+        # HTTP-date format — rough fallback
+        return 60.0
+
+
 async def _complete_openai(
     prompt: str,
     expect_json: bool,
     system_instruction: str | None,
     retry_count: int = 0,
     skip_retries_if_local: bool = False,
+    response_schema: dict | None = None,
 ) -> tuple[str, bool]:
     """
     Complete using OpenAI chat completions API.
@@ -194,6 +237,7 @@ async def _complete_openai(
     global _openai_rate_limited, _openai_rate_limit_reset_task
 
     settings = get_settings()
+    # TODO: add token budget (max_tokens_per_request_chain) to short-circuit expensive orchestrations
     headers = {
         "Authorization": f"Bearer {settings.openai_api_key}",
         "Content-Type": "application/json",
@@ -206,13 +250,28 @@ async def _complete_openai(
     url = _openai_chat_url()
 
     for model in (settings.openai_model_primary, settings.openai_model_fallback):
+        # Per-model cooldown check
+        async with _model_cooldown_lock:
+            if _model_cooldown.get(model):
+                logger.info(f"Model '{model}' is rate-limited, skipping to next model")
+                continue
+
         body: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "temperature": 0.2 if expect_json else 0.3,
             "max_tokens": 16384,
         }
-        if expect_json:
+        if response_schema:
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "extraction_result",
+                    "strict": True,
+                    "schema": response_schema,
+                },
+            }
+        elif expect_json:
             body["response_format"] = {"type": "json_object"}
 
         try:
@@ -220,33 +279,49 @@ async def _complete_openai(
                 r = await client.post(url, headers=headers, json=body)
 
                 if r.status_code == 429:
+                    # Respect Retry-After header; fall back to exponential backoff
+                    retry_after = _parse_retry_after(r.headers)
+                    wait_time = retry_after if retry_after > 0 else (2 ** retry_count) * 3.0
+
+                    # Mark this specific model as cooling down
+                    async with _model_cooldown_lock:
+                        _model_cooldown[model] = True
+                        if model in _model_cooldown_tasks and not _model_cooldown_tasks[model].done():
+                            _model_cooldown_tasks[model].cancel()
+                        _model_cooldown_tasks[model] = asyncio.create_task(
+                            _reset_model_cooldown_after_delay(model, max(wait_time, 60.0))
+                        )
+
+                    # Keep global flag in sync
                     async with _openai_rate_limit_lock:
                         _openai_rate_limited = True
                         if _openai_rate_limit_reset_task and not _openai_rate_limit_reset_task.done():
                             _openai_rate_limit_reset_task.cancel()
                         _openai_rate_limit_reset_task = asyncio.create_task(
-                            _reset_openai_rate_limit_after_delay(120.0)
+                            _reset_openai_rate_limit_after_delay(max(wait_time, 60.0))
                         )
 
                     if skip_retries_if_local:
-                        logger.warning("OpenAI rate limited (429) — falling back to Ollama")
+                        logger.warning(f"OpenAI model {model} rate limited (429) — falling back to Ollama")
                         return "", True
 
                     if retry_count < 3 and settings.llm_retry_on_rate_limit:
-                        wait_time = (2 ** retry_count) * 3.0
                         logger.warning(
-                            f"OpenAI rate limited (429), waiting {wait_time}s before retry {retry_count + 1}"
+                            f"OpenAI model {model} rate limited (429), "
+                            f"waiting {wait_time:.0f}s before retry {retry_count + 1}"
                         )
                         await asyncio.sleep(wait_time)
                         return await _complete_openai(
-                            prompt, expect_json, system_instruction, retry_count + 1, skip_retries_if_local
+                            prompt, expect_json, system_instruction,
+                            retry_count + 1, skip_retries_if_local,
+                            response_schema=response_schema,
                         )
 
-                    logger.error(f"OpenAI rate limited after {retry_count} retries")
-                    return "", True
+                    logger.error(f"OpenAI model {model} rate limited after {retry_count} retries")
+                    continue
 
-                if r.status_code == 400 and expect_json and "response_format" in body:
-                    logger.warning(f"OpenAI model {model}: JSON mode rejected, retrying without response_format")
+                if r.status_code == 400 and "response_format" in body:
+                    logger.warning(f"OpenAI model {model}: response_format rejected (400), retrying without it")
                     body.pop("response_format", None)
                     r = await client.post(url, headers=headers, json=body)
 
@@ -255,7 +330,9 @@ async def _complete_openai(
 
             content = (data.get("choices") or [{}])[0].get("message", {}).get("content") or ""
             if expect_json:
+                # Strip markdown fences, then extract the JSON block (same as Ollama path)
                 content = _strip_json_fences(content)
+                content = _extract_json_block(content)
 
             async with _openai_rate_limit_lock:
                 _openai_rate_limited = False
@@ -338,6 +415,7 @@ async def complete_llm(
     expect_json: bool = False,
     system_instruction: str | None = None,
     priority: int = 5,
+    response_schema: dict | None = None,
 ) -> str:
     """
     Enqueue an LLM completion request and await the result.
@@ -349,6 +427,11 @@ async def complete_llm(
     Workers execute requests in (priority, arrival_order) order, so a
     priority=1 request always runs before a queued priority=8 request,
     regardless of arrival time.
+
+    response_schema: optional JSON Schema dict. When provided, uses OpenAI
+      Structured Outputs (json_schema mode) instead of json_object mode.
+      The schema is wrapped as {"name": "extraction_result", "strict": True, ...}.
+      Falls back to json_object if the model or API version doesn't support it.
 
     Fallback order per worker:
       1. OpenAI (if OPENAI_API_KEY is set and not rate-limited)
@@ -364,7 +447,9 @@ async def complete_llm(
     seq = _request_seq
 
     logger.debug(f"LLM request enqueued (priority={priority}, seq={seq})")
-    await _llm_request_queue.put((priority, seq, prompt, expect_json, system_instruction, future))
+    await _llm_request_queue.put(
+        (priority, seq, prompt, expect_json, system_instruction, response_schema, future)
+    )
     return await future
 
 
@@ -378,6 +463,12 @@ async def reset_openai_rate_limit():
 
 def is_openai_rate_limited() -> bool:
     return _openai_rate_limited
+
+
+def is_llm_available() -> bool:
+    """Return True when at least one LLM backend is configured and reachable."""
+    settings = get_settings()
+    return bool(settings.openai_api_key) or bool(settings.ollama_enabled)
 
 
 # Backward-compatible aliases (deprecated)

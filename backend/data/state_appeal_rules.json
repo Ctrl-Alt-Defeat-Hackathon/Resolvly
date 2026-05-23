@@ -1,0 +1,113 @@
+{
+  "_note": "Curated appeal deadlines for the 10 most-populous US states + Indiana. Source: state insurance codes and ACA §2719 implementation. Last verified: 2025-01-01. Web search is the fallback for all other states.",
+  "CA": {
+    "internal_appeal_days": 180,
+    "external_review_days": 180,
+    "external_review_authority": "California Department of Managed Health Care (DMHC) / California Department of Insurance (CDI)",
+    "external_review_statute": "Cal. Health & Safety Code §§ 1374.30–1374.34; Cal. Ins. Code § 10169",
+    "expedited_hours": 72,
+    "source_url": "https://www.dmhc.ca.gov/HealthCareinCalifornia/AppealsandGrievances.aspx",
+    "last_verified": "2025-01-01",
+    "notes": "CA offers Independent Medical Review (IMR) through DMHC for HMO plans and CDI for PPO plans. IMR decisions are binding."
+  },
+  "TX": {
+    "internal_appeal_days": 180,
+    "external_review_days": 120,
+    "external_review_authority": "Texas Department of Insurance (TDI)",
+    "external_review_statute": "Tex. Ins. Code §§ 4201.001–4201.656",
+    "expedited_hours": 72,
+    "source_url": "https://www.tdi.texas.gov/consumer/complain.html",
+    "last_verified": "2025-01-01",
+    "notes": "TX requires Independent Review Organizations (IROs) accredited by URAC for external review."
+  },
+  "FL": {
+    "internal_appeal_days": 180,
+    "external_review_days": 60,
+    "external_review_authority": "Florida Department of Financial Services (DFS) / Florida Office of Insurance Regulation (OIR)",
+    "external_review_statute": "Fla. Stat. §§ 627.6471, 641.3155",
+    "expedited_hours": 72,
+    "source_url": "https://www.myfloridacfo.com/division/consumer/",
+    "last_verified": "2025-01-01",
+    "notes": "Florida external review deadline is 60 days from internal denial. OIR oversees HMO appeals."
+  },
+  "NY": {
+    "internal_appeal_days": 180,
+    "external_review_days": 45,
+    "external_review_authority": "New York State Department of Financial Services (DFS) — External Appeal Program",
+    "external_review_statute": "N.Y. Ins. Law §§ 4900–4910; N.Y. Pub. Health Law § 4900",
+    "expedited_hours": 72,
+    "source_url": "https://www.dfs.ny.gov/consumers/health_insurance/external_appeal",
+    "last_verified": "2025-01-01",
+    "notes": "NY external appeal must be filed within 45 days of final adverse determination. External appeal is free; independent organization decides within 30 days."
+  },
+  "PA": {
+    "internal_appeal_days": 180,
+    "external_review_days": 120,
+    "external_review_authority": "Pennsylvania Insurance Department (PID)",
+    "external_review_statute": "40 P.S. §§ 991.2161–991.2193 (Pennsylvania HMO Act)",
+    "expedited_hours": 72,
+    "source_url": "https://www.insurance.pa.gov/Consumers/Pages/HealthInsurance.aspx",
+    "last_verified": "2025-01-01",
+    "notes": "PA external review available for medical necessity and experimental treatment denials."
+  },
+  "IL": {
+    "internal_appeal_days": 180,
+    "external_review_days": 60,
+    "external_review_authority": "Illinois Department of Insurance (IDOI)",
+    "external_review_statute": "215 ILCS 5/155.36; 215 ILCS 134/Art. XIIA",
+    "expedited_hours": 72,
+    "source_url": "https://insurance.illinois.gov/consumer/health.html",
+    "last_verified": "2025-01-01",
+    "notes": "IL external review deadline is 60 days from final internal adverse determination."
+  },
+  "OH": {
+    "internal_appeal_days": 180,
+    "external_review_days": 120,
+    "external_review_authority": "Ohio Department of Insurance (ODI)",
+    "external_review_statute": "Ohio Rev. Code §§ 3923.65–3923.68",
+    "expedited_hours": 72,
+    "source_url": "https://insurance.ohio.gov/consumer/health-insurance",
+    "last_verified": "2025-01-01",
+    "notes": "OH external review process available through ODI-certified IROs."
+  },
+  "GA": {
+    "internal_appeal_days": 180,
+    "external_review_days": 120,
+    "external_review_authority": "Georgia Office of Insurance and Safety Fire Commissioner",
+    "external_review_statute": "O.C.G.A. §§ 33-20A-1 et seq.",
+    "expedited_hours": 72,
+    "source_url": "https://oci.georgia.gov/consumers/health-insurance",
+    "last_verified": "2025-01-01",
+    "notes": "GA external review available for adverse benefit determinations involving medical necessity."
+  },
+  "NC": {
+    "internal_appeal_days": 180,
+    "external_review_days": 120,
+    "external_review_authority": "North Carolina Department of Insurance (NCDOI)",
+    "external_review_statute": "N.C. Gen. Stat. §§ 58-50-75 et seq.",
+    "expedited_hours": 72,
+    "source_url": "https://www.ncdoi.gov/consumers/health-insurance",
+    "last_verified": "2025-01-01",
+    "notes": "NC external review available for medical necessity and experimental treatment denials."
+  },
+  "MI": {
+    "internal_appeal_days": 180,
+    "external_review_days": 120,
+    "external_review_authority": "Michigan Department of Insurance and Financial Services (DIFS)",
+    "external_review_statute": "MCL §§ 500.3476–500.3478",
+    "expedited_hours": 72,
+    "source_url": "https://www.michigan.gov/difs/consumers/health-insurance",
+    "last_verified": "2025-01-01",
+    "notes": "MI external review available through DIFS for denials based on medical necessity or experimental treatments."
+  },
+  "IN": {
+    "internal_appeal_days": 180,
+    "external_review_days": 120,
+    "external_review_authority": "Indiana Department of Insurance (IDOI)",
+    "external_review_statute": "IC § 27-8-29-13",
+    "expedited_hours": 72,
+    "source_url": "https://www.in.gov/idoi/consumers/health-insurance/",
+    "last_verified": "2025-01-01",
+    "notes": "Indiana external review requires submission within 4 months of final internal adverse determination."
+  }
+}

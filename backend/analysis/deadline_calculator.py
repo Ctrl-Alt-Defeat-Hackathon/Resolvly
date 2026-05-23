@@ -37,6 +37,7 @@ class AppealDeadlines(BaseModel):
     expedited_available: bool = False
     expedited_qualifier: str = ""
     ics_events: list[dict] = []
+    note: str = ""   # Populated when denial_date is missing or assumptions were made
 
 
 def _days_remaining(deadline: dt.date) -> int:
@@ -65,7 +66,16 @@ def calculate_deadlines(
 
     if denial_date is None:
         logger.warning("No date_of_denial on claim — cannot calculate deadlines")
-        return AppealDeadlines()
+        return AppealDeadlines(
+            note=(
+                "Appeal deadlines could not be calculated because the denial date was not "
+                "found in your documents. To get accurate deadlines: locate the date printed "
+                "on your denial letter (often labeled 'Date of Determination' or 'Date of "
+                "Notice'), then count 180 days forward for the internal appeal deadline "
+                "(ACA § 2719) or 90 days for Medicaid fair hearings (42 CFR § 431.220). "
+                "Do not wait — deadlines are strictly enforced."
+            )
+        )
 
     deadlines = AppealDeadlines()
     ics_events: list[dict] = []
@@ -107,19 +117,32 @@ def calculate_deadlines(
             "Last day to file internal appeal per ACA § 2719",
         ))
 
-        # External review: 4 months (~122 days) from internal appeal denial
-        external_date = internal_date + dt.timedelta(days=122)
+        # External review: 4 months (~122 days) from INTERNAL APPEAL DENIAL date
+        # Since we don't know when the internal appeal will be denied, we show a range:
+        # Earliest = today + 122 days (if internal appeal resolved immediately)
+        # Latest   = internal_appeal_deadline + 122 days (worst case)
+        ext_earliest = dt.date.today() + dt.timedelta(days=122)
+        external_date = internal_date + dt.timedelta(days=122)   # latest / conservative estimate
         days_left_external = _days_remaining(external_date)
         deadlines.external_review = DeadlineInfo(
             deadline_date=external_date,
             days_remaining=days_left_external,
-            source="ACA § 2719 — 4 months after internal appeal denial",
+            source=(
+                f"ACA § 2719 — 4 months (≈122 days) after internal appeal denial. "
+                f"Estimated range: {ext_earliest.isoformat()} (earliest) to "
+                f"{external_date.isoformat()} (latest, if internal appeal filed on last day). "
+                "Actual clock starts from your internal appeal denial letter."
+            ),
             already_passed=days_left_external < 0,
         )
         ics_events.append(_build_ics_event(
-            "External Review Deadline (Estimated)",
+            "External Review Deadline (Estimated — Latest)",
             external_date,
-            "Estimated last day to request external review per ACA § 2719. Actual deadline is 4 months from internal appeal denial date.",
+            (
+                "Latest estimated deadline to request external review per ACA § 2719. "
+                "Actual deadline is 4 months from YOUR internal appeal denial date — "
+                f"could be as early as {ext_earliest.isoformat()}. File sooner."
+            ),
         ))
 
     elif regulation_type == RegulationType.medicaid:

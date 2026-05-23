@@ -24,8 +24,30 @@ from agents.regulation_agent import run_regulation_agent, RegulationEnrichment
 from agents.state_rules_agent import run_state_rules_agent, StateRulesEnrichment
 from agents.analysis_agent import run_analysis_agent, AnalysisResult
 from analysis.root_cause_classifier import classify_root_cause
+from tools.llm_client import is_llm_available
 
 logger = logging.getLogger(__name__)
+
+# Per-agent wall-clock timeout (seconds).  Exceed → agent is treated as failed
+# but the rest of the pipeline continues with an empty default result.
+_AGENT_TIMEOUTS: dict[str, float] = {
+    "code_lookup_agent": 15.0,
+    "regulation_agent": 20.0,
+    "state_rules_agent": 20.0,
+    "analysis_agent": 30.0,
+}
+
+
+async def _with_timeout(coro, timeout_s: float, agent_name: str):
+    """
+    Await *coro* with a hard timeout.  Raises asyncio.TimeoutError (which
+    asyncio.gather catches when return_exceptions=True) on expiry.
+    """
+    try:
+        return await asyncio.wait_for(coro, timeout=timeout_s)
+    except asyncio.TimeoutError:
+        logger.warning(f"{agent_name} timed out after {timeout_s}s")
+        raise
 
 
 class OrchestratorResult(BaseModel):
@@ -33,6 +55,11 @@ class OrchestratorResult(BaseModel):
     enrichment: dict[str, Any] = {}
     analysis: dict[str, Any] = {}
     sources: list[dict[str, Any]] = []
+    errors: list[str] = []
+    # Per-agent execution status: "ok" | "timeout" | "error"
+    agent_status: dict[str, str] = {}
+    # False when no LLM key is configured and Ollama is disabled
+    llm_available: bool = True
 
 
 class OrchestratorProgress(BaseModel):
@@ -94,7 +121,7 @@ def _build_enrichment_dict(
             "state": state_rules.state,
             "doi_contact": state_rules.doi_contact,
             "appeal_rules": state_rules.appeal_rules,
-            "state_deadlines": state_rules.state_deadlines,
+            "state_deadlines": state_rules.state_deadlines.model_dump(),
             "consumer_resources": state_rules.consumer_resources,
             "external_review_available": state_rules.external_review_available,
             "external_review_url": state_rules.external_review_url,
@@ -135,6 +162,32 @@ def _collect_sources(
     return sources
 
 
+def _unpack_agent_outcomes(
+    outcomes: tuple,
+    errors: list[str],
+    agent_status: dict[str, str],
+) -> tuple[CodeLookupResult, RegulationEnrichment, StateRulesEnrichment]:
+    """
+    Unpack asyncio.gather(return_exceptions=True) results for the 3 parallel agents.
+    Substitutes an empty default when an agent fails, and records the error.
+    Populates agent_status with "ok" | "timeout" | "error" per agent.
+    """
+    names = ("code_lookup_agent", "regulation_agent", "state_rules_agent")
+    defaults = (CodeLookupResult(), RegulationEnrichment(), StateRulesEnrichment())
+    results = []
+    for name, outcome, default in zip(names, outcomes, defaults):
+        if isinstance(outcome, Exception):
+            status = "timeout" if isinstance(outcome, asyncio.TimeoutError) else "error"
+            logger.error(f"{name} failed ({status}): {outcome}")
+            errors.append(f"{name}: {outcome}")
+            agent_status[name] = status
+            results.append(default)
+        else:
+            agent_status[name] = "ok"
+            results.append(outcome)
+    return tuple(results)
+
+
 async def run_orchestrator(
     claim: ClaimObject,
     plan_context: PlanContext | None = None,
@@ -155,18 +208,37 @@ async def run_orchestrator(
     logger.info(f"Orchestrator: root cause pre-classified as {root_cause_pre.category}")
 
     # Stage 1: Run Code Lookup, Regulation, and State Rules agents in parallel
+    # return_exceptions=True: one failing agent doesn't kill the entire run
     logger.info("Orchestrator: dispatching parallel agents (code lookup, regulation, state rules)")
-    code_result, regulation_result, state_result = await asyncio.gather(
-        run_code_lookup_agent(claim),
-        run_regulation_agent(claim),
-        run_state_rules_agent(claim),
-        return_exceptions=False,
+    outcomes = await asyncio.gather(
+        _with_timeout(run_code_lookup_agent(claim), _AGENT_TIMEOUTS["code_lookup_agent"], "code_lookup_agent"),
+        _with_timeout(run_regulation_agent(claim), _AGENT_TIMEOUTS["regulation_agent"], "regulation_agent"),
+        _with_timeout(run_state_rules_agent(claim), _AGENT_TIMEOUTS["state_rules_agent"], "state_rules_agent"),
+        return_exceptions=True,
+    )
+
+    pipeline_errors: list[str] = []
+    agent_status: dict[str, str] = {}
+    code_result, regulation_result, state_result = _unpack_agent_outcomes(
+        outcomes, pipeline_errors, agent_status
     )
 
     logger.info("Orchestrator: parallel agents complete — running Analysis Agent")
 
-    # Stage 2: Run Analysis Agent — pass root_cause_pre to avoid a second classification call
-    analysis_result: AnalysisResult = await run_analysis_agent(claim, root_cause_result=root_cause_pre)
+    # Stage 2: Run Analysis Agent — pass root_cause_pre and code_result to avoid re-work
+    try:
+        analysis_result: AnalysisResult = await _with_timeout(
+            run_analysis_agent(claim, root_cause_result=root_cause_pre, code_lookup_result=code_result),
+            _AGENT_TIMEOUTS["analysis_agent"],
+            "analysis_agent",
+        )
+        agent_status["analysis_agent"] = "ok"
+    except Exception as e:
+        status = "timeout" if isinstance(e, asyncio.TimeoutError) else "error"
+        logger.error(f"Analysis Agent failed ({status}): {e}")
+        pipeline_errors.append(f"analysis_agent: {e}")
+        agent_status["analysis_agent"] = status
+        analysis_result = AnalysisResult()
 
     logger.info("Orchestrator: Analysis Agent complete — assembling response")
 
@@ -178,6 +250,9 @@ async def run_orchestrator(
         enrichment=enrichment,
         analysis=analysis_result.model_dump(),
         sources=sources,
+        errors=pipeline_errors,
+        agent_status=agent_status,
+        llm_available=is_llm_available(),
     )
 
 
@@ -210,11 +285,28 @@ async def stream_orchestrator(
     claim.derived.root_cause_category = root_cause_pre.category
 
     # Run all 3 parallel agents and yield as each completes
-    code_task = asyncio.create_task(run_code_lookup_agent(claim))
-    regulation_task = asyncio.create_task(run_regulation_agent(claim))
-    state_task = asyncio.create_task(run_state_rules_agent(claim))
+    stream_errors: list[str] = []
+    stream_agent_status: dict[str, str] = {}
+    code_task = asyncio.create_task(
+        _with_timeout(run_code_lookup_agent(claim), _AGENT_TIMEOUTS["code_lookup_agent"], "code_lookup_agent")
+    )
+    regulation_task = asyncio.create_task(
+        _with_timeout(run_regulation_agent(claim), _AGENT_TIMEOUTS["regulation_agent"], "regulation_agent")
+    )
+    state_task = asyncio.create_task(
+        _with_timeout(run_state_rules_agent(claim), _AGENT_TIMEOUTS["state_rules_agent"], "state_rules_agent")
+    )
 
-    code_result: CodeLookupResult = await code_task
+    try:
+        code_result: CodeLookupResult = await code_task
+        stream_agent_status["code_lookup_agent"] = "ok"
+    except Exception as e:
+        status = "timeout" if isinstance(e, asyncio.TimeoutError) else "error"
+        logger.error(f"code_lookup_agent failed (streaming, {status}): {e}")
+        stream_errors.append(f"code_lookup_agent: {e}")
+        stream_agent_status["code_lookup_agent"] = status
+        code_result = CodeLookupResult()
+
     yield OrchestratorProgress(
         event="codes_enriched",
         data={
@@ -230,7 +322,16 @@ async def stream_orchestrator(
         },
     )
 
-    regulation_result: RegulationEnrichment = await regulation_task
+    try:
+        regulation_result: RegulationEnrichment = await regulation_task
+        stream_agent_status["regulation_agent"] = "ok"
+    except Exception as e:
+        status = "timeout" if isinstance(e, asyncio.TimeoutError) else "error"
+        logger.error(f"regulation_agent failed (streaming, {status}): {e}")
+        stream_errors.append(f"regulation_agent: {e}")
+        stream_agent_status["regulation_agent"] = status
+        regulation_result = RegulationEnrichment()
+
     yield OrchestratorProgress(
         event="regulations_enriched",
         data={
@@ -241,7 +342,16 @@ async def stream_orchestrator(
         },
     )
 
-    state_result: StateRulesEnrichment = await state_task
+    try:
+        state_result: StateRulesEnrichment = await state_task
+        stream_agent_status["state_rules_agent"] = "ok"
+    except Exception as e:
+        status = "timeout" if isinstance(e, asyncio.TimeoutError) else "error"
+        logger.error(f"state_rules_agent failed (streaming, {status}): {e}")
+        stream_errors.append(f"state_rules_agent: {e}")
+        stream_agent_status["state_rules_agent"] = status
+        state_result = StateRulesEnrichment()
+
     yield OrchestratorProgress(
         event="state_rules_enriched",
         data={
@@ -252,8 +362,21 @@ async def stream_orchestrator(
         },
     )
 
-    # Analysis (sequential) — reuse root_cause_pre to skip second classification
-    analysis_result: AnalysisResult = await run_analysis_agent(claim, root_cause_result=root_cause_pre)
+    # Analysis (sequential) — reuse root_cause_pre and code_result to skip re-work
+    try:
+        analysis_result: AnalysisResult = await _with_timeout(
+            run_analysis_agent(claim, root_cause_result=root_cause_pre, code_lookup_result=code_result),
+            _AGENT_TIMEOUTS["analysis_agent"],
+            "analysis_agent",
+        )
+        stream_agent_status["analysis_agent"] = "ok"
+    except Exception as e:
+        status = "timeout" if isinstance(e, asyncio.TimeoutError) else "error"
+        logger.error(f"analysis_agent failed (streaming, {status}): {e}")
+        stream_errors.append(f"analysis_agent: {e}")
+        stream_agent_status["analysis_agent"] = status
+        analysis_result = AnalysisResult()
+
     yield OrchestratorProgress(
         event="analysis_complete",
         data={
@@ -275,6 +398,9 @@ async def stream_orchestrator(
             "enrichment": enrichment,
             "analysis": analysis_result.model_dump(),
             "sources": sources,
+            "errors": stream_errors,
+            "agent_status": stream_agent_status,
+            "llm_available": is_llm_available(),
         },
     )
 

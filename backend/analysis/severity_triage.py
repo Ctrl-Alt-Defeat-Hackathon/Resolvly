@@ -25,51 +25,73 @@ def triage_severity(
     """
     Classify the urgency of the claim denial.
 
-    Urgent:         < 30 days to deadline OR expedited review noted OR amount > $10,000
-    Time-Sensitive: < 60 days to deadline OR amount > $3,000
-    Routine:        otherwise
-    """
-    urgent_signals = 0
-    time_sensitive_signals = 0
+    Immediate urgent rules (bypass scoring):
+      - Appeal deadline already passed
+      - Expedited review explicitly noted in denial letter
 
-    # Signal 1: Days remaining until deadline
+    Continuous score rules (urgent ≥ 2, time-sensitive ≥ 1):
+      - Days: max(0, (60 - days_left) / 30)   [0.0 – 2.0+]
+      - Financial: $50k+ → +3, $10k+ → +2, $3k+ → +1
+      - ICD-10 clinical urgency: oncology (C00-C97), pregnancy (O00-O9A), transplant (Z94) → +2
+      - Narrative keywords (emergency, ICU, …) → +2
+      - Prior auth denied → +0.5
+    """
+    # Immediate urgent: deadline passed or expedited review flagged
+    if internal_deadline and (internal_deadline - date.today()).days < 0:
+        return SeverityTriage.urgent
+    if claim.appeal_rights.expedited_review_available is True:
+        return SeverityTriage.urgent
+
+    score = 0.0
+
+    # Days remaining — continuous scoring
     if internal_deadline:
         days_left = (internal_deadline - date.today()).days
-        if days_left < 0:
-            # Already passed — still flag as urgent to prompt action
-            urgent_signals += 3
-        elif days_left < 30:
-            urgent_signals += 2
-        elif days_left < 60:
-            time_sensitive_signals += 1
+        score += max(0.0, (60 - days_left) / 30)
 
-    # Signal 2: Denied amount
+    # Financial stakes
     denied = claim.financial.denied_amount
     if denied is not None:
-        if denied >= 10000:
-            urgent_signals += 1
-        elif denied >= 3000:
-            time_sensitive_signals += 1
+        if denied >= 50_000:
+            score += 3
+        elif denied >= 10_000:
+            score += 2
+        elif denied >= 3_000:
+            score += 1
 
-    # Signal 3: Expedited review explicitly noted in denial letter
-    if claim.appeal_rights.expedited_review_available is True:
-        urgent_signals += 1
+    # ICD-10 clinical urgency signals
+    icd10_codes = claim.service_billing.icd10_diagnosis_codes
+    for code in icd10_codes:
+        c = code.upper()
+        if not c:
+            continue
+        if c[0] == "C":            # Malignant neoplasms C00–C97
+            score += 2
+            break
+    for code in icd10_codes:
+        c = code.upper()
+        if c and c[0] == "O":      # Pregnancy / obstetric O00–O9A
+            score += 2
+            break
+    for code in icd10_codes:
+        if code.upper().startswith("Z94"):   # Transplanted organ status
+            score += 2
+            break
 
-    # Signal 4: Prior auth denial — often time-sensitive (patient awaiting treatment)
-    if claim.denial_reason.prior_auth_status in ("required_not_obtained", "denied"):
-        time_sensitive_signals += 1
-
-    # Signal 5: Ongoing treatment / medical necessity denial
-    # Inferred from denial narrative keywords
+    # Narrative urgency keywords
     narrative = (claim.denial_reason.denial_reason_narrative or "").lower()
     urgent_keywords = ["emergency", "urgent", "life-threatening", "hospitalized", "icu", "surgery scheduled"]
     if any(kw in narrative for kw in urgent_keywords):
-        urgent_signals += 2
+        score += 2
+
+    # Prior auth denied — patient may be awaiting treatment
+    if claim.denial_reason.prior_auth_status in ("required_not_obtained", "denied"):
+        score += 0.5
 
     # Classify
-    if urgent_signals >= 2:
+    if score >= 2:
         return SeverityTriage.urgent
-    elif urgent_signals >= 1 or time_sensitive_signals >= 2:
+    elif score >= 1:
         return SeverityTriage.time_sensitive
     else:
         return SeverityTriage.routine
