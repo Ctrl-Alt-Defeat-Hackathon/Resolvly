@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import ScrollToTop from './components/ScrollToTop'
 import LandingPage from './pages/LandingPage'
 import AnalyzeFlow from './pages/AnalyzeFlow'
 import ActionPlan from './pages/ActionPlan'
@@ -11,6 +12,7 @@ import CodeLookupContent from './pages/CodeLookupContent'
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/upload-wizard" element={<Navigate to="/analyze" replace />} />
