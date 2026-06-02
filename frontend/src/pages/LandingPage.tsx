@@ -76,42 +76,6 @@ function useRevealEngine() {
   }, [])
 }
 
-// ── Scroll tilt hook ──────────────────────────────────────────────────────────
-function useScrollTilt(maxTilt: number) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || maxTilt === 0) return
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduce) { el.style.transform = 'none'; return }
-    let raf = 0
-    const update = () => {
-      raf = 0
-      const vh = window.innerHeight || 800
-      const r = el.getBoundingClientRect()
-      const start = vh * 0.9, end = vh * 0.3
-      let p = (start - r.top) / (start - end)
-      p = Math.max(0, Math.min(1, p))
-      const tilt = maxTilt * (1 - p)
-      const scale = 0.94 + 0.06 * p
-      const lift = 28 * (1 - p)
-      el.style.transform = `perspective(1800px) rotateX(${tilt.toFixed(2)}deg) scale(${scale.toFixed(3)}) translateY(${lift.toFixed(1)}px)`
-    }
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update) }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
-    update()
-    const t = setTimeout(update, 200)
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
-      cancelAnimationFrame(raf)
-      clearTimeout(t)
-    }
-  }, [maxTilt])
-  return ref
-}
-
 // ── Faux UI frames ────────────────────────────────────────────────────────────
 function BrowserFrame({ children, url: _url = 'app.resolvly.com/action-plan' }: { children: ReactNode; url?: string }) {
   return (
@@ -390,15 +354,13 @@ function FauxLetter() {
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
 function DreelioHero({ variant = 'centered', onStart }: { variant?: 'centered' | 'split'; onStart: () => void }) {
-  const tiltRef = useScrollTilt(variant === 'split' ? 0 : 9)
-
   const eyebrow = (
-    <span className="eyebrow reveal">
+    <span className="eyebrow hero-land-1">
       <span className="dot" /> Indiana-focused regulatory guidance
     </span>
   )
   const ctas = (
-    <div className="hero-ctas reveal reveal-d3" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+    <div className="hero-ctas hero-land-4" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
       <button className="btn btn-primary" style={{ padding: '15px 28px', fontSize: 16 }} onClick={onStart}>
         Start Free Analysis <span className="ms arrow" style={{ fontSize: 19 }}>arrow_forward</span>
       </button>
@@ -435,23 +397,17 @@ function DreelioHero({ variant = 'centered', onStart }: { variant?: 'centered' |
   }
 
   return (
-    <header id="top" className="section" style={{ paddingTop: 148, paddingBottom: 'clamp(40px,6vw,80px)', textAlign: 'center' }}>
+    <header id="top" className="hero-viewport">
       <div className="wrap" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26 }}>
         {eyebrow}
-        <h1 className="display reveal reveal-d1" style={{ color: 'var(--ink)', maxWidth: 1000, margin: 0 }}>
+        <h1 className="display hero-land-2" style={{ color: 'var(--ink)', maxWidth: 1000, margin: 0 }}>
           Understand your insurance denial in <span style={{ color: 'var(--accent)' }}>plain english</span>.
         </h1>
-        <p className="lead reveal reveal-d2" style={{ maxWidth: 620, textAlign: 'center', margin: 0 }}>
+        <p className="lead hero-land-3" style={{ maxWidth: 620, textAlign: 'center', margin: 0 }}>
           Helping Hoosiers navigate insurance denial complexity. Professional analysis, regulatory alignment, and guided appeal drafting — in under 20 seconds.
         </p>
         {ctas}
       </div>
-      <Reveal delay={180} className="wrap-wide hero-art" style={{ marginTop: 56, position: 'relative' }}>
-        <div style={{ position: 'absolute', inset: '-4% 6% 8%', background: 'radial-gradient(50% 50% at 50% 0%, rgba(0,52,97,0.12), transparent)', filter: 'blur(24px)' }} />
-        <div ref={tiltRef} style={{ position: 'relative', maxWidth: 1040, margin: '0 auto', transformOrigin: 'center top', willChange: 'transform' }}>
-          <BrowserFrame><FauxDashboard /></BrowserFrame>
-        </div>
-      </Reveal>
     </header>
   )
 }

@@ -172,17 +172,22 @@ const FUNDING_OPTIONS = [
 ]
 
 function StepFunding({
-  planType, funding, onSelect, onNext, onSkip,
+  planType, funding, onSelect, onNext, onSkip, onBack,
 }: {
   planType: string
   funding: string
   onSelect: (v: string) => void
   onNext: () => void
   onSkip: () => void
+  onBack: () => void
 }) {
   const isRequired = planType === 'employer'
   return (
     <div>
+      <button type="button" className="wizard-back-btn wizard-back-btn--inline" onClick={onBack}>
+        <span className="ms" style={{ fontSize: 18 }}>arrow_back</span>
+        Back
+      </button>
       <span className="wizard-kicker">Step 2 of 3</span>
       <h1 className="h-xl" style={{ color: 'var(--ink)', margin: '0 0 12px' }}>
         What's the funding structure?
@@ -248,6 +253,7 @@ function StepUpload({
   onDrop,
   onDemoCase,
   onBeginAnalysis,
+  onBack,
   inputRefs,
 }: {
   files: UploadedFile[]
@@ -265,6 +271,7 @@ function StepUpload({
   onDrop: (kind: DocKind, files: FileList) => void
   onDemoCase: (id: DemoCaseId) => void
   onBeginAnalysis: () => void
+  onBack: () => void
   inputRefs: Record<DocKind, React.RefObject<HTMLInputElement | null>>
 }) {
   const getFile = (k: DocKind) => files.find(f => f.docKind === k)
@@ -277,6 +284,10 @@ function StepUpload({
 
   return (
     <div>
+      <button type="button" className="wizard-back-btn wizard-back-btn--inline" onClick={onBack}>
+        <span className="ms" style={{ fontSize: 18 }}>arrow_back</span>
+        Back
+      </button>
       <span className="wizard-kicker">Step 3 of 3</span>
       <h1 className="h-xl" style={{ color: 'var(--ink)', margin: '0 0 12px' }}>
         Upload your documents
@@ -759,6 +770,7 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
                     onSelect={setFunding}
                     onNext={goNext}
                     onSkip={() => { setFunding(''); goNext() }}
+                    onBack={goBack}
                   />
                 )}
                 {step === 2 && (
@@ -778,6 +790,7 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
                     onDrop={(kind, fl) => addFileFromInput(kind, fl)}
                     onDemoCase={id => void handleDemoCase(id)}
                     onBeginAnalysis={beginAnalysis}
+                    onBack={goBack}
                     inputRefs={inputRefs}
                   />
                 )}

@@ -734,6 +734,34 @@
     border-radius: var(--r-pill);
     box-shadow: var(--sh-lg);
   }
+
+  /* Analyze wizard — back above step kicker, clear of fixed nav */
+  .dreelio-landing .wizard-shell {
+    padding-top: 92px;
+  }
+
+  .dreelio-landing .wizard-layout {
+    padding-top: 20px;
+  }
+
+  .dreelio-landing .wizard-header {
+    margin-bottom: 28px;
+    min-height: 28px;
+  }
+
+  .dreelio-landing .wizard-header .wizard-back-btn {
+    display: none;
+  }
+
+  .dreelio-landing .wizard-header .wizard-back-spacer {
+    display: none;
+  }
+
+  .dreelio-landing .wizard-back-btn--inline {
+    display: inline-flex;
+    margin-bottom: 14px;
+  }
+
   .dreelio-landing .tabs-card > div:last-child {
     border-left: none !important;
     border-top: 1px solid var(--line) !important;
@@ -775,6 +803,41 @@
   .dreelio-landing .bento-bottom { grid-template-columns: 1fr !important; }
   .dreelio-landing .footer-grid  { grid-template-columns: 1fr !important; }
   .dreelio-landing .hero-art     { display: none; }
+}
+
+/* ====================================================================
+   HERO — full-viewport + entrance animation
+   ==================================================================== */
+
+/* Hero — leaves trust marquee visible on entry */
+.dreelio-landing .hero-viewport {
+  min-height: 75vh;
+  min-height: 75svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 88px;   /* clear fixed nav */
+  padding-bottom: 48px;
+  text-align: center;
+}
+
+/* Entrance animation */
+@keyframes heroLandIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dreelio-landing .hero-land-1 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both; }
+.dreelio-landing .hero-land-2 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both; }
+.dreelio-landing .hero-land-3 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.38s both; }
+.dreelio-landing .hero-land-4 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.52s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dreelio-landing .hero-land-1,
+  .dreelio-landing .hero-land-2,
+  .dreelio-landing .hero-land-3,
+  .dreelio-landing .hero-land-4 { animation: none; }
 }
 
 /* ====================================================================
@@ -828,6 +891,9 @@
   z-index: 1;
 }
 .dreelio-landing .wizard-back-btn:hover { color: var(--accent); }
+.dreelio-landing .wizard-back-btn--inline {
+  display: none;
+}
 .dreelio-landing .wizard-back-spacer { flex: 1; }
 
 .dreelio-landing .wizard-dots {
