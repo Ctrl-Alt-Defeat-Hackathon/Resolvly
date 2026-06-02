@@ -133,16 +133,6 @@ function BrowserFrame({ children, url: _url = 'app.resolvly.com/action-plan' }: 
   )
 }
 
-function PhoneFrame({ children }: { children: ReactNode }) {
-  return (
-    <div style={{ width: 300, maxWidth: '100%', background: '#14110b', borderRadius: 44, padding: 10, boxShadow: 'var(--sh-xl)' }}>
-      <div style={{ background: '#f8f9fa', borderRadius: 36, overflow: 'hidden', position: 'relative', minHeight: 520 }}>
-        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', width: 88, height: 24, background: '#14110b', borderRadius: 999, zIndex: 5 }} />
-        {children}
-      </div>
-    </div>
-  )
-}
 
 function Gauge({ pct = 62, size = 64, stroke = 6 }: { pct?: number; size?: number; stroke?: number }) {
   const r = (size - stroke) / 2
@@ -277,156 +267,6 @@ function FauxDashboard() {
   )
 }
 
-function FauxMobile() {
-  const steps = [
-    { n: 1, t: 'Retroactive prior auth', a: true },
-    { n: 2, t: 'File internal appeal', a: false },
-    { n: 3, t: 'IDOI external review', a: false },
-  ]
-  const gaugeR = 22
-  const gaugeC = 2 * Math.PI * gaugeR
-
-  return (
-    <div style={{ fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', minHeight: 520 }}>
-      <div style={{ height: 44, flexShrink: 0 }} aria-hidden />
-      <div
-        style={{
-          padding: '0 14px 10px',
-          borderBottom: '1px solid #eceef0',
-          background: '#fff',
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontWeight: 700, fontSize: 13, color: navy, letterSpacing: '-0.03em' }}>Resolvly</span>
-      </div>
-
-      <div style={{ padding: '14px 14px 18px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-        <div
-          style={{
-            background: navy,
-            borderRadius: 14,
-            padding: '12px 14px',
-            color: '#fff',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8abcff', marginBottom: 10 }}>
-            Likelihood of success
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
-              <svg width={48} height={48} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
-                <circle cx={24} cy={24} r={gaugeR} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={4} />
-                <circle
-                  cx={24}
-                  cy={24}
-                  r={gaugeR}
-                  fill="none"
-                  stroke="#8abcff"
-                  strokeWidth={4}
-                  strokeLinecap="round"
-                  strokeDasharray={`${(gaugeC * 62) / 100} ${gaugeC}`}
-                />
-              </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>
-                62%
-              </div>
-            </div>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 500, lineHeight: 1.45, color: 'rgba(255,255,255,0.92)' }}>
-              Prior auth denial — procedural and often reversible.
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: ink2,
-              marginBottom: 8,
-            }}
-          >
-            Recovery roadmap
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {steps.map((s) => (
-              <div
-                key={s.n}
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                  alignItems: 'center',
-                  background: '#fff',
-                  border: '1px solid #e8eaed',
-                  borderRadius: 10,
-                  padding: '8px 10px',
-                }}
-              >
-                <div
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 999,
-                    flex: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 600,
-                    fontSize: 10,
-                    background: s.a ? navy : '#eceef0',
-                    color: s.a ? '#fff' : ink2,
-                  }}
-                >
-                  {s.n}
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 500, color: inkDark, lineHeight: 1.3 }}>{s.t}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            gap: 10,
-            alignItems: 'center',
-            background: 'var(--error-bg)',
-            borderRadius: 10,
-            padding: '9px 10px',
-            marginTop: 'auto',
-          }}
-        >
-          <div
-            style={{
-              width: 32,
-              height: 36,
-              borderRadius: 7,
-              flex: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#fff',
-            }}
-          >
-            <span style={{ fontSize: 7, fontWeight: 600, color: 'var(--error-ink)', letterSpacing: '0.04em' }}>MAR</span>
-            <span style={{ fontSize: 14, fontWeight: 700, lineHeight: 1, color: 'var(--error-ink)' }}>14</span>
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--error-ink)', lineHeight: 1.25 }}>Internal appeal due</div>
-            <div style={{ fontSize: 9.5, color: 'var(--error-ink)', opacity: 0.85, marginTop: 2, lineHeight: 1.35 }}>
-              180 days from EOB receipt
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function FauxUpload() {
   const docs = [
@@ -645,69 +485,145 @@ function TrustMarquee() {
   )
 }
 
-// ── Devices ───────────────────────────────────────────────────────────────────
-function Devices() {
-  const [view, setView] = useState<'web' | 'mobile'>('web')
-  const stageRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const el = stageRef.current
-    if (!el) return
-    const t = setTimeout(() => {
-      el.style.animation = 'none'
-      el.style.opacity = '1'
-      el.style.transform = 'none'
-    }, 480)
-    return () => clearTimeout(t)
-  }, [view])
-
-  const options: Array<{ id: 'web' | 'mobile'; label: string; icon: string }> = [
-    { id: 'web', label: 'Web App', icon: 'desktop_windows' },
-    { id: 'mobile', label: 'Mobile App', icon: 'smartphone' },
+// ── Before / After Slider ─────────────────────────────────────────────────────
+function FauxDenialLetter() {
+  const mono = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+  const rows = [
+    ['Member', 'Sarah M. Patterson'], ['Group ID', 'IN-4472-GRP'],
+    ['Service Date', '01/14/2026'], ['Provider', 'IU Health Physicians'],
+    ['Claim Type', 'Professional (CMS-1500)'], ['POS', '22 — Outpatient Hospital'],
   ]
+  return (
+    <div style={{ fontFamily: '"Times New Roman", Times, Georgia, serif', fontSize: 11.5, lineHeight: 1.55, color: '#1a1a1a', background: '#f8f7f4', height: '100%', overflow: 'hidden', padding: '24px 28px 0', boxSizing: 'border-box', userSelect: 'none' }}>
+      {/* Letterhead */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 12, marginBottom: 12, borderBottom: '2px solid #1a3a5c' }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a5c', letterSpacing: '0.03em', textTransform: 'uppercase', fontFamily: 'Arial, sans-serif' }}>Anthem Blue Cross Blue Shield</div>
+          <div style={{ fontSize: 9.5, color: '#666', marginTop: 2, fontFamily: 'Arial, sans-serif' }}>P.O. Box 7820 · Indianapolis, IN 46207 · 1-800-331-1476</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 9.5, color: '#555', fontFamily: 'Arial, sans-serif' }}>January 28, 2026</div>
+          <div style={{ fontSize: 9.5, color: '#555', fontFamily: 'Arial, sans-serif' }}>Claim #: HM-2026-0041837</div>
+          <div style={{ marginTop: 6, padding: '3px 8px', background: '#b91c1c', color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'Arial, sans-serif', display: 'inline-block', transform: 'rotate(-1.5deg)' }}>CLAIM DENIED</div>
+        </div>
+      </div>
+      {/* Title */}
+      <div style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12, fontFamily: 'Arial, sans-serif' }}>Notice of Adverse Benefit Determination</div>
+      {/* Member info */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', marginBottom: 12, fontSize: 10, fontFamily: 'Arial, sans-serif' }}>
+        {rows.map(([l, v]) => <div key={l}><span style={{ color: '#777' }}>{l}:</span> <strong>{v}</strong></div>)}
+      </div>
+      {/* Table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 9.5, fontFamily: 'Arial, sans-serif' }}>
+        <thead>
+          <tr style={{ background: '#1a3a5c', color: '#fff' }}>
+            {['CPT', 'Service Description', 'Billed', 'Allowed', 'Adj. Code', 'Paid'].map(h => <th key={h} style={{ padding: '4px 6px', textAlign: 'left', fontWeight: 600 }}>{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          <tr style={{ borderBottom: '1px solid #ddd', background: '#fff5f5' }}>
+            <td style={{ padding: '4px 6px', fontFamily: mono, fontWeight: 700, color: '#b91c1c' }}>70553</td>
+            <td style={{ padding: '4px 6px' }}>MRI Brain w/o and w/ Contrast</td>
+            <td style={{ padding: '4px 6px' }}>$4,820.00</td>
+            <td style={{ padding: '4px 6px' }}>$3,670.00</td>
+            <td style={{ padding: '4px 6px', fontFamily: mono, fontWeight: 700, color: '#b91c1c' }}>CO-197</td>
+            <td style={{ padding: '4px 6px', fontWeight: 700, color: '#b91c1c' }}>$0.00</td>
+          </tr>
+          <tr style={{ borderBottom: '1px solid #ddd' }}>
+            <td style={{ padding: '4px 6px', fontFamily: mono, color: '#666' }}>99213</td>
+            <td style={{ padding: '4px 6px' }}>Office Visit — Established Patient</td>
+            <td style={{ padding: '4px 6px' }}>$285.00</td>
+            <td style={{ padding: '4px 6px' }}>$162.00</td>
+            <td style={{ padding: '4px 6px', color: '#aaa' }}>—</td>
+            <td style={{ padding: '4px 6px', fontWeight: 700, color: '#047857' }}>$97.00</td>
+          </tr>
+        </tbody>
+      </table>
+      {/* Denial reason */}
+      <div style={{ marginBottom: 11 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, marginBottom: 4, textDecoration: 'underline', fontFamily: 'Arial, sans-serif' }}>Reason for Denial:</div>
+        <div style={{ background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 3, padding: '7px 10px', fontSize: 10, fontFamily: 'Arial, sans-serif', lineHeight: 1.6 }}>
+          <span style={{ fontFamily: mono, color: '#b91c1c', fontWeight: 700 }}>CO-197</span> — Precertification/authorization/notification absent. Pursuant to §6(b)(iv) of your Certificate of Coverage, this service required prior authorization under the plan's Utilization Management program. The authorization request was not submitted prior to the service date, nor was retroactive authorization obtained within the required 72-hour post-service window per Plan Guidelines §14.2(c). Accordingly, the claim is non-covered under Group Policy No. IN-4472.
+        </div>
+      </div>
+      {/* Appeal rights */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, marginBottom: 4, textDecoration: 'underline', fontFamily: 'Arial, sans-serif' }}>Your Appeal Rights (IC 27-8-29 / 45 CFR §147.136):</div>
+        <p style={{ fontSize: 9.5, color: '#444', lineHeight: 1.6, margin: 0, fontFamily: 'Arial, sans-serif' }}>
+          You may request an internal appeal within 180 calendar days by submitting a written request to the Anthem Appeals &amp; Grievances Unit at the address above, including your member ID, claim number, and supporting clinical documentation. If the internal appeal is denied, you may request External Review through the Indiana Department of Insurance (IDOI) within 120 days of notification. Expedited review is available for urgent clinical matters within 72 hours (1-800-622-4461).
+        </p>
+      </div>
+      {/* Fine print */}
+      <div style={{ fontSize: 8.5, color: '#999', borderTop: '1px solid #ddd', paddingTop: 7, lineHeight: 1.45, fontFamily: 'Arial, sans-serif' }}>
+        This EOB is not a bill. Benefits are subject to COB provisions, plan limitations, and cost-sharing obligations. Reference: Bulletin 193 · IC 27-8-17-12 · 29 CFR §2560.503-1 · HIPAA 45 CFR Parts 160 &amp; 164.
+      </div>
+    </div>
+  )
+}
+
+const SLIDER_MID = 50
+
+function BeforeAfterSlider() {
+  const [pos, setPos] = useState(SLIDER_MID)
+  const [snapping, setSnapping] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const capturing = useRef(false)
+
+  function updatePos(clientX: number) {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setPos(Math.min(92, Math.max(8, ((clientX - rect.left) / rect.width) * 100)))
+  }
+
+  function releaseAndSnap() {
+    capturing.current = false
+    // First render: add the transition CSS; second render (next task): move to center.
+    // Separating these ensures the browser sees a "from" value before the transition fires.
+    setSnapping(true)
+    setTimeout(() => setPos(SLIDER_MID), 0)
+  }
+
+  const transition = snapping ? 'left 0.6s cubic-bezier(0.22,1,0.36,1), clip-path 0.6s cubic-bezier(0.22,1,0.36,1)' : 'none'
 
   return (
     <section className="section">
       <div className="wrap">
-        <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 36px' }}>
+        <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 40px' }}>
           <Reveal as="h2" className="h-xl reveal-d1" style={{ color: 'var(--ink)', margin: '0 0 16px' }}>
-            Track your appeal from desk or<br />pocket — always in sync
+            From a wall of codes<br />to a clear action plan
           </Reveal>
           <Reveal as="p" className="lead reveal-d2" style={{ margin: 0 }}>
-            The full forensic analysis on the web, a calm at-a-glance plan on mobile. Pick up exactly where you left off.
+            Drag the handle to see how Resolvly transforms an intimidating denial letter into a step-by-step plan you can act on today.
           </Reveal>
         </div>
 
-        <Reveal delay={60} style={{ display: 'flex', justifyContent: 'center', marginBottom: 36 }}>
-          <div style={{ position: 'relative', display: 'inline-flex', padding: 5, gap: 4, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 'var(--r-pill)', boxShadow: 'var(--sh-sm)' }}>
-            <div style={{ position: 'absolute', top: 5, bottom: 5, width: 'calc(50% - 5px)', left: view === 'web' ? 5 : 'calc(50%)', background: 'var(--accent)', borderRadius: 'var(--r-pill)', transition: 'left .4s var(--ease)', boxShadow: 'var(--sh-md)' }} />
-            {options.map((o) => {
-              const on = view === o.id
-              return (
-                <button key={o.id} onClick={() => setView(o.id)} style={{ position: 'relative', zIndex: 1, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 24px', borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: 'var(--font)', fontSize: 15, fontWeight: 600, color: on ? '#fff' : 'var(--ink-2)', transition: 'color .3s var(--ease)', whiteSpace: 'nowrap' }}>
-                  <span className={on ? 'ms fill' : 'ms'} style={{ fontSize: 19 }}>{o.icon}</span>{o.label}
-                </button>
-              )
-            })}
-          </div>
-        </Reveal>
+        <Reveal delay={80}>
+          <div
+            ref={containerRef}
+            style={{ position: 'relative', borderRadius: 'var(--r-xl)', overflow: 'hidden', boxShadow: 'var(--sh-xl)', height: 520, cursor: 'ew-resize', userSelect: 'none' }}
+          >
+            {/* BEFORE — denial letter */}
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <FauxDenialLetter />
+            </div>
 
-        <Reveal delay={120} style={{ position: 'relative', borderRadius: 'var(--r-xl)', background: 'linear-gradient(160deg, #f4eee3, #e7dfcf)', border: '1px solid var(--line)', padding: 'clamp(28px,5vw,64px)', overflow: 'hidden' }}>
-          <span className="ms" style={{ position: 'absolute', top: -30, right: -20, fontSize: 200, color: 'rgba(0,52,97,0.04)' }}>sync</span>
-          <div style={{ position: 'relative', minHeight: 480, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* AFTER — Resolvly dashboard, revealed from the divider rightward */}
+            <div style={{ position: 'absolute', inset: 0, clipPath: `inset(0 0 0 ${pos}%)`, transition }}>
+              <BrowserFrame url="app.resolvly.com/action-plan"><FauxDashboard /></BrowserFrame>
+            </div>
+
+            {/* Divider line */}
+            <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(${pos}% - 1px)`, width: 2, background: '#fff', pointerEvents: 'none', boxShadow: '0 0 16px rgba(0,0,0,0.3)', transition }} />
+
+            {/* Drag handle */}
             <div
-              key={view}
-              ref={stageRef}
-              className="device-swap"
-              style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}
+              style={{ position: 'absolute', top: '50%', left: `${pos}%`, transform: 'translate(-50%, -50%)', width: 48, height: 48, borderRadius: '50%', background: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'ew-resize', zIndex: 10, touchAction: 'none', transition }}
+              onPointerDown={(e) => { e.preventDefault(); capturing.current = true; setSnapping(false); e.currentTarget.setPointerCapture(e.pointerId) }}
+              onPointerMove={(e) => { if (capturing.current) updatePos(e.clientX) }}
+              onPointerUp={releaseAndSnap}
+              onPointerCancel={releaseAndSnap}
             >
-              {view === 'web' ? (
-                <div style={{ width: '100%', maxWidth: 820 }}>
-                  <BrowserFrame url="app.resolvly.com/action-plan"><FauxDashboard /></BrowserFrame>
-                </div>
-              ) : (
-                <PhoneFrame><FauxMobile /></PhoneFrame>
-              )}
+              <span className="ms" style={{ fontSize: 22, color: 'var(--accent)' }}>compare_arrows</span>
             </div>
           </div>
         </Reveal>
@@ -1132,7 +1048,7 @@ function LandingPageContent() {
       <main>
         <DreelioHero variant="centered" onStart={goToAnalyze} />
         <TrustMarquee />
-        <Devices />
+        <BeforeAfterSlider />
         <FeatureTabs />
         <FeatureGrid />
         <CTABanner onStart={goToAnalyze} />
