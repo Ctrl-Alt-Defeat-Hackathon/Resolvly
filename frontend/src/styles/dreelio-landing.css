@@ -117,6 +117,7 @@
    KEYFRAMES — prefixed to avoid collisions
    ==================================================================== */
 @keyframes dl-marquee { to { transform: translateX(-50%); } }
+@keyframes dl-marquee-reverse { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 @keyframes dl-tabfade { from { transform: translateY(10px); } to { transform: none; } }
 @keyframes dl-devswap { from { opacity: .4; transform: scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes dl-bob     { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -245,6 +246,67 @@
 }
 .dreelio-landing .marquee:hover .marquee-track { animation-play-state: paused; }
 
+/* Source logos — dual-row opposing marquees */
+.dreelio-landing .sources-card {
+  overflow: hidden;
+}
+
+.dreelio-landing .sources-marquee {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 calc(-1 * clamp(8px, 2vw, 16px));
+}
+
+.dreelio-landing .sources-marquee-row {
+  --mq-dur: 34s;
+}
+
+.dreelio-landing .sources-marquee-row--reverse .marquee-track {
+  animation: dl-marquee-reverse var(--mq-dur, 38s) linear infinite;
+}
+
+.dreelio-landing .sources-marquee-track {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: max-content;
+}
+
+.dreelio-landing .sources-marquee-item {
+  flex: 0 0 auto;
+  width: clamp(96px, 22vw, 118px);
+}
+
+.dreelio-landing .source-logo-tile {
+  aspect-ratio: 1.55;
+  width: 100%;
+  border-radius: var(--r-md);
+  background: var(--card-pure);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  box-sizing: border-box;
+}
+
+.dreelio-landing .source-logo-tile-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: -0.01em;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
 /* Animations */
 .dreelio-landing .tab-copy, .dreelio-landing .tab-screen { animation: dl-tabfade .45s var(--ease); }
 .dreelio-landing .device-swap { animation: dl-devswap .45s var(--ease); }
@@ -254,6 +316,120 @@
 .dreelio-landing .deck-card {
   transition: transform .55s var(--ease), opacity .5s var(--ease),
               filter .5s var(--ease), visibility .5s;
+}
+
+/* Pipeline — mobile stacked steps */
+.dreelio-landing .pipeline-mobile-nav {
+  position: sticky;
+  top: 72px;
+  z-index: 12;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px;
+  margin: 0 0 28px;
+  background: rgba(251, 248, 241, 0.92);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-md);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.dreelio-landing .pipeline-mobile-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background 0.3s var(--ease), color 0.3s var(--ease), transform 0.3s var(--ease);
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+  transform: scale(1.02);
+  box-shadow: var(--sh-md);
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn.is-done:not(.is-active) {
+  color: var(--ink-2);
+}
+
+.dreelio-landing .pipeline-mobile-nav-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-pure);
+  color: var(--accent);
+  border: 1px solid var(--line-strong);
+  transition: background 0.3s var(--ease), color 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn.is-active .pipeline-mobile-nav-icon {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.dreelio-landing .pipeline-mobile-nav-label {
+  white-space: nowrap;
+}
+
+.dreelio-landing .pipeline-mobile-step {
+  scroll-margin-top: 148px;
+  margin-bottom: clamp(40px, 8vw, 64px);
+  opacity: 0.42;
+  transform: translateY(28px);
+  transition: opacity 0.55s var(--ease), transform 0.55s var(--ease);
+}
+
+.dreelio-landing .pipeline-mobile-step.is-active,
+.dreelio-landing .pipeline-mobile-step.is-past {
+  transform: none;
+}
+
+.dreelio-landing .pipeline-mobile-step.is-active {
+  opacity: 1;
+}
+
+.dreelio-landing .pipeline-mobile-step.is-past:not(.is-active) {
+  opacity: 0.78;
+}
+
+.dreelio-landing .pipeline-mobile-step-copy {
+  margin-bottom: 20px;
+}
+
+.dreelio-landing .pipeline-mobile-step-screen {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--sh-lg);
+}
+
+.dreelio-landing .pipeline-mobile-step.is-active .pipeline-mobile-step-screen {
+  animation: dl-tabfade 0.5s var(--ease);
+}
+
+.dreelio-landing.dreelio-dark .pipeline-mobile-nav {
+  background: rgba(28, 25, 20, 0.92);
 }
 
 /* Nav link hover */
@@ -277,6 +453,146 @@
   border-bottom-color: var(--accent);
 }
 
+/* Marketing nav bar */
+.dreelio-landing .dreelio-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1320px;
+  height: 76px;
+  padding: 0 28px;
+  border-radius: 0;
+  background: rgba(239, 232, 219, 0);
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: max-width 0.45s var(--ease), height 0.45s var(--ease), padding 0.45s var(--ease),
+    border-radius 0.45s var(--ease), background 0.45s var(--ease), box-shadow 0.45s var(--ease),
+    border-color 0.45s var(--ease), backdrop-filter 0.45s var(--ease);
+  position: relative;
+}
+
+.dreelio-landing .dreelio-nav-bar.is-scrolled,
+.dreelio-landing .dreelio-nav-bar.is-menu-open {
+  max-width: 880px;
+  height: 60px;
+  padding: 0 12px 0 24px;
+  border-radius: var(--r-pill);
+  background: rgba(251, 248, 241, 0.72);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--sh-lg);
+}
+
+.dreelio-landing .nav-links-desktop {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.dreelio-landing .nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.dreelio-landing .nav-logo-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.06em;
+}
+
+.dreelio-landing .nav-logo-word {
+  font-weight: 800;
+  font-size: 21px;
+  color: var(--accent);
+  letter-spacing: -0.045em;
+}
+
+.dreelio-landing .nav-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.dreelio-landing .nav-mobile-toggle:hover {
+  background: rgba(33, 29, 22, 0.06);
+}
+
+.dreelio-landing .nav-menu-icon {
+  width: 22px;
+  height: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dreelio-landing .nav-menu-icon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+}
+
+.dreelio-landing .nav-menu-icon.is-open span:first-child {
+  transform: translateY(5px) rotate(45deg);
+}
+
+.dreelio-landing .nav-menu-icon.is-open span:last-child {
+  transform: translateY(-5px) rotate(-45deg);
+}
+
+.dreelio-landing .mobile-nav-backdrop {
+  display: none;
+}
+
+@keyframes mobile-nav-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mobile-nav-stack-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dreelio-landing.dreelio-dark .dreelio-nav-bar.is-scrolled,
+.dreelio-landing.dreelio-dark .dreelio-nav-bar.is-menu-open {
+  background: rgba(28, 25, 20, 0.82);
+  border-color: rgba(255, 255, 255, 0.12);
+}
 
 /* ====================================================================
    REDUCED MOTION
@@ -284,11 +600,18 @@
 @media (prefers-reduced-motion: reduce) {
   .dreelio-landing .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .dreelio-landing .marquee-track { animation: none !important; }
+  .dreelio-landing .sources-marquee-row--reverse .marquee-track { animation: none !important; }
   .dreelio-landing .btn:hover, .dreelio-landing .card-hover:hover { transform: none !important; }
   .dreelio-landing .device-swap,
   .dreelio-landing .tab-copy,
   .dreelio-landing .tab-screen { animation: none !important; }
   .dreelio-landing .deck-card { transition: none !important; }
+  .dreelio-landing .pipeline-mobile-step,
+  .dreelio-landing .pipeline-mobile-nav-btn { transition: none !important; }
+  .dreelio-landing .pipeline-mobile-step.is-active .pipeline-mobile-step-screen { animation: none !important; }
+  .dreelio-landing .mobile-nav-backdrop,
+  .dreelio-landing .mobile-nav-stack { animation: none !important; }
+  .dreelio-landing .nav-menu-icon span { transition: none !important; }
 }
 
 /* ====================================================================
@@ -304,7 +627,112 @@
   .dreelio-landing .deck          { height: min(64vh, 480px) !important; }
   .dreelio-landing .bento-bottom  { grid-template-columns: 1fr 1fr !important; }
   .dreelio-landing .footer-grid   { grid-template-columns: 1fr 1fr !important; }
-  .dreelio-landing .nav-links     { display: none !important; }
+  .dreelio-landing .nav-links-desktop { display: none !important; }
+  .dreelio-landing .nav-desktop-cta    { display: none !important; }
+
+  .dreelio-landing .dreelio-nav-shell {
+    padding: 14px 16px 0 !important;
+  }
+
+  .dreelio-landing .dreelio-nav-bar {
+    max-width: none !important;
+    width: 100% !important;
+    height: 56px !important;
+    padding: 0 14px 0 18px !important;
+    border-radius: var(--r-pill) !important;
+    background: rgba(251, 248, 241, 0.88) !important;
+    backdrop-filter: blur(16px) saturate(1.4) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(1.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.65) !important;
+    box-shadow: var(--sh-lg) !important;
+  }
+
+  .dreelio-landing.dreelio-dark .dreelio-nav-bar {
+    background: rgba(28, 25, 20, 0.88) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dreelio-landing .nav-mobile-toggle {
+    display: flex !important;
+  }
+
+  .dreelio-landing .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    margin: 0;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    background: rgba(33, 29, 22, 0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: mobile-nav-fade-in 0.35s var(--ease);
+  }
+
+  .dreelio-landing .mobile-nav-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    animation: mobile-nav-stack-in 0.4s var(--ease);
+  }
+
+  .dreelio-landing .mobile-nav-card {
+    background: rgba(251, 248, 241, 0.78);
+    backdrop-filter: blur(22px) saturate(1.5);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 32px;
+    box-shadow: var(--sh-lg);
+    padding: clamp(40px, 12vw, 64px) 24px;
+    min-height: min(48vh, 380px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dreelio-landing.dreelio-dark .mobile-nav-card {
+    background: rgba(28, 25, 20, 0.82);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .dreelio-landing .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(20px, 5vw, 30px);
+    width: 100%;
+  }
+
+  .dreelio-landing .nav-link-mobile {
+    font-size: clamp(21px, 5.2vw, 27px);
+    font-weight: 500;
+    color: var(--ink);
+    border-bottom: none;
+    padding: 0;
+    letter-spacing: -0.02em;
+  }
+
+  .dreelio-landing .nav-link-mobile:hover,
+  .dreelio-landing .nav-link-mobile.is-active {
+    border-bottom: none;
+  }
+
+  .dreelio-landing .nav-link-mobile.is-active {
+    font-weight: 600;
+  }
+
+  .dreelio-landing .mobile-nav-cta {
+    width: 100%;
+    justify-content: center;
+    padding: 15px 22px;
+    font-size: 16px;
+    border-radius: var(--r-pill);
+    box-shadow: var(--sh-lg);
+  }
   .dreelio-landing .tabs-card > div:last-child {
     border-left: none !important;
     border-top: 1px solid var(--line) !important;
@@ -318,6 +746,28 @@
     min-height: 0 !important;
   }
   .dreelio-landing .pipeline-hint { display: none !important; }
+
+  .dreelio-landing .pipeline-mobile-nav {
+    top: 64px;
+  }
+
+  .dreelio-landing .pipeline-mobile-step {
+    scroll-margin-top: 132px;
+  }
+}
+
+@media (max-width: 767px) {
+  .dreelio-landing #top .hero-ctas {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .dreelio-landing #top .hero-ctas .btn {
+    width: min(100%, 320px);
+    justify-content: center;
+  }
 }
 
 @media (max-width: 640px) {

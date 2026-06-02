@@ -558,7 +558,7 @@ function DreelioHero({ variant = 'centered', onStart }: { variant?: 'centered' |
     </span>
   )
   const ctas = (
-    <div className="reveal reveal-d3" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+    <div className="hero-ctas reveal reveal-d3" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
       <button className="btn btn-primary" style={{ padding: '15px 28px', fontSize: 16 }} onClick={onStart}>
         Start Free Analysis <span className="ms arrow" style={{ fontSize: 19 }}>arrow_forward</span>
       </button>
@@ -716,6 +716,24 @@ function Devices() {
   )
 }
 
+const PIPELINE_MOBILE_MQ = '(max-width: 980px)'
+
+function usePipelineMobileLayout() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(PIPELINE_MOBILE_MQ).matches,
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia(PIPELINE_MOBILE_MQ)
+    const onChange = () => setIsMobile(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  return isMobile
+}
+
 // ── Feature Tabs (Pipeline) ───────────────────────────────────────────────────
 interface PipelineCard {
   id: string
@@ -737,14 +755,16 @@ function FeatureTabs() {
   const [active, setActive] = useState(0)
   const [progress, setProgress] = useState(0)
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const stepRefs = useRef<(HTMLElement | null)[]>([])
+  const isMobile = usePipelineMobileLayout()
 
   useEffect(() => {
+    if (isMobile) return
     const scroller = scrollerRef.current
     if (!scroller) return
     let raf = 0
     const update = () => {
       raf = 0
-      if (window.innerWidth <= 980) { setProgress(0); setActive(0); return }
       const vh = window.innerHeight || 800
       const total = scroller.offsetHeight - vh
       const top = scroller.getBoundingClientRect().top
@@ -763,11 +783,36 @@ function FeatureTabs() {
       cancelAnimationFrame(raf)
       clearTimeout(t)
     }
-  }, [N])
+  }, [N, isMobile])
+
+  useEffect(() => {
+    if (!isMobile) return
+    const observers: IntersectionObserver[] = []
+    stepRefs.current.forEach((el, i) => {
+      if (!el) return
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (!entry.isIntersecting) return
+          setActive(i)
+          setProgress((i + 1) / N)
+        },
+        { threshold: 0.45, rootMargin: '-12% 0px -40% 0px' },
+      )
+      obs.observe(el)
+      observers.push(obs)
+    })
+    return () => observers.forEach((obs) => obs.disconnect())
+  }, [isMobile, N])
 
   const goToStep = (i: number) => {
+    if (isMobile) {
+      setActive(i)
+      setProgress((i + 1) / N)
+      stepRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
     const scroller = scrollerRef.current
-    if (!scroller || window.innerWidth <= 980) { setActive(i); return }
+    if (!scroller) return
     const vh = window.innerHeight || 800
     const total = scroller.offsetHeight - vh
     const top = scroller.offsetTop + ((i + 0.5) / N) * total
@@ -789,14 +834,76 @@ function FeatureTabs() {
     }
   }
 
+  const pipelineIntro = (
+    <div className="wrap-wide" style={{ paddingTop: 'clamp(72px,10vw,128px)' }}>
+      <div style={{ textAlign: 'center', maxWidth: 680, margin: '0 auto' }}>
+        <Reveal as="h2" className="h-xl reveal-d1" style={{ color: 'var(--ink)', margin: '0 0 16px' }}>The Proprietary Resolution Pipeline</Reveal>
+        <Reveal as="p" className="lead reveal-d2" style={{ margin: 0 }}>
+          {isMobile
+            ? 'A multi-agent forensic engine turns an opaque denial into an action plan, a deadline calendar, and a finished appeal. Scroll or tap a step to explore each stage.'
+            : 'A multi-agent forensic engine turns an opaque denial into an action plan, a deadline calendar, and a finished appeal. Scroll to step through each stage.'}
+        </Reveal>
+      </div>
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <section id="pipeline" style={{ background: 'var(--canvas-soft)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
+        {pipelineIntro}
+        <div className="wrap-wide pipeline-mobile" style={{ paddingBottom: 'clamp(48px, 8vw, 96px)' }}>
+          <nav className="pipeline-mobile-nav" aria-label="Pipeline steps">
+            {CARDS.map((c, i) => {
+              const on = i === active
+              const done = i < active
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={['pipeline-mobile-nav-btn', on ? 'is-active' : '', done ? 'is-done' : ''].filter(Boolean).join(' ')}
+                  onClick={() => goToStep(i)}
+                >
+                  <span className="pipeline-mobile-nav-icon">
+                    <span className={(on || done) ? 'ms fill' : 'ms'} style={{ fontSize: 18 }}>{done ? 'check' : c.icon}</span>
+                  </span>
+                  <span className="pipeline-mobile-nav-label">{c.label}</span>
+                </button>
+              )
+            })}
+          </nav>
+
+          {CARDS.map((c, i) => {
+            const Screen = c.Screen
+            const on = i === active
+            const past = i < active
+            return (
+              <article
+                key={c.id}
+                id={`pipeline-step-${c.id}`}
+                ref={(el) => { stepRefs.current[i] = el }}
+                className={['pipeline-mobile-step', on ? 'is-active' : '', past ? 'is-past' : ''].filter(Boolean).join(' ')}
+              >
+                <div className="pipeline-mobile-step-copy">
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
+                    {String(i + 1).padStart(2, '0')} / {String(N).padStart(2, '0')}
+                  </span>
+                  <h3 className="h-lg" style={{ color: 'var(--accent)', margin: '10px 0 12px', fontSize: 22 }}>{c.title}</h3>
+                  <p className="body" style={{ margin: 0 }}>{c.desc}</p>
+                </div>
+                <div className="pipeline-mobile-step-screen tab-screen">
+                  <BrowserFrame><Screen /></BrowserFrame>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section id="pipeline" style={{ background: 'var(--canvas-soft)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-      <div className="wrap-wide" style={{ paddingTop: 'clamp(72px,10vw,128px)' }}>
-        <div style={{ textAlign: 'center', maxWidth: 680, margin: '0 auto' }}>
-          <Reveal as="h2" className="h-xl reveal-d1" style={{ color: 'var(--ink)', margin: '0 0 16px' }}>The Proprietary Resolution Pipeline</Reveal>
-          <Reveal as="p" className="lead reveal-d2" style={{ margin: 0 }}>A multi-agent forensic engine turns an opaque denial into an action plan, a deadline calendar, and a finished appeal. Scroll to step through each stage.</Reveal>
-        </div>
-      </div>
+      {pipelineIntro}
 
       <div ref={scrollerRef} className="pipeline-scroller" style={{ position: 'relative', height: `calc(100vh + ${(N - 1) * 60}vh)` }}>
         <div className="pipeline-sticky" style={{ position: 'sticky', top: 0, minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
@@ -857,11 +964,44 @@ function FeatureTabs() {
 }
 
 // ── Feature Grid ──────────────────────────────────────────────────────────────
-function SourceLogo({ icon, label }: { icon: string; label: string }) {
+type SourceItem = { icon: string; label: string }
+
+function SourceLogo({ icon, label }: SourceItem) {
   return (
-    <div className="card-hover" style={{ aspectRatio: '1.6', borderRadius: 'var(--r-md)', background: 'var(--card-pure)', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+    <div className="source-logo-tile card-hover">
       <span className="ms" style={{ fontSize: 24, color: 'var(--accent)' }}>{icon}</span>
-      <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-2)', letterSpacing: '-0.01em' }}>{label}</span>
+      <span className="source-logo-tile-label">{label}</span>
+    </div>
+  )
+}
+
+function SourceLogosMarquee({ items }: { items: SourceItem[] }) {
+  const midpoint = Math.ceil(items.length / 2)
+  const topRow = items.slice(0, midpoint)
+  const bottomRow = items.slice(midpoint)
+
+  function renderRow(row: SourceItem[], direction: 'forward' | 'reverse', keyPrefix: string) {
+    const loop = row.concat(row)
+    return (
+      <div
+        className={['marquee', 'sources-marquee-row', `sources-marquee-row--${direction}`].join(' ')}
+        style={{ '--mq-dur': direction === 'forward' ? '34s' : '38s' } as CSSProperties}
+      >
+        <div className="marquee-track sources-marquee-track">
+          {loop.map((s, i) => (
+            <div key={`${keyPrefix}-${s.label}-${i}`} className="sources-marquee-item">
+              <SourceLogo {...s} />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="sources-marquee" aria-label="Authoritative data sources">
+      {renderRow(topRow, 'forward', 'top')}
+      {renderRow(bottomRow, 'reverse', 'bottom')}
     </div>
   )
 }
@@ -900,12 +1040,10 @@ function FeatureGrid() {
             </div>
           </Reveal>
 
-          <Reveal delay={100} className="card" style={{ padding: 'clamp(24px,3vw,40px)' }}>
+          <Reveal delay={100} className="card sources-card" style={{ padding: 'clamp(24px,3vw,40px)' }}>
             <h3 className="h-lg" style={{ color: 'var(--ink)', margin: '0 0 6px' }}>Accuracy you can cite in court</h3>
             <p className="body" style={{ margin: '0 0 22px', maxWidth: 380 }}>Every code and citation is verified against authoritative federal and Indiana databases — not a model's memory.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-              {sources.map((s) => <SourceLogo key={s.label} {...s} />)}
-            </div>
+            <SourceLogosMarquee items={sources} />
           </Reveal>
         </div>
 
