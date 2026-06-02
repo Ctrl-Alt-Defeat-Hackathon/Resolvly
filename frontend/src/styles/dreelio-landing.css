@@ -776,3 +776,381 @@
   .dreelio-landing .footer-grid  { grid-template-columns: 1fr !important; }
   .dreelio-landing .hero-art     { display: none; }
 }
+
+/* ====================================================================
+   WIZARD — Analyze / Demo onboarding flow
+   ==================================================================== */
+
+@keyframes wizardEnterUp {
+  from { opacity: 0; transform: translateY(52px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes wizardEnterDown {
+  from { opacity: 0; transform: translateY(-52px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dreelio-landing .wiz-enter-fwd  { animation: wizardEnterUp   0.52s var(--ease) both; }
+.dreelio-landing .wiz-enter-back { animation: wizardEnterDown 0.52s var(--ease) both; }
+
+.dreelio-landing .wizard-shell {
+  min-height: 100vh;
+  padding-top: 80px;
+}
+
+.dreelio-landing .wizard-layout {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: clamp(44px,6vw,80px) 24px clamp(60px,8vw,100px);
+}
+
+/* Header row — back button left, dots centered, right spacer */
+.dreelio-landing .wizard-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 56px;
+  min-height: 36px;
+}
+.dreelio-landing .wizard-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: color 0.2s;
+  font-family: var(--font);
+  z-index: 1;
+}
+.dreelio-landing .wizard-back-btn:hover { color: var(--accent); }
+.dreelio-landing .wizard-back-spacer { flex: 1; }
+
+.dreelio-landing .wizard-dots {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dreelio-landing .wizard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  opacity: 0.15;
+  transition: width 0.35s var(--ease), opacity 0.35s var(--ease), background 0.35s var(--ease);
+}
+.dreelio-landing .wizard-dot.active {
+  width: 24px;
+  opacity: 1;
+  background: var(--accent);
+}
+.dreelio-landing .wizard-dot.done {
+  opacity: 0.45;
+  background: var(--accent);
+}
+
+/* Step heading block */
+.dreelio-landing .wizard-kicker {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-tint);
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  margin-bottom: 18px;
+}
+
+/* ─ Plan-type option cards (step 0) ─────────────────────────── */
+.dreelio-landing .plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 40px;
+}
+@media (max-width: 660px) {
+  .dreelio-landing .plan-grid { grid-template-columns: 1fr; }
+}
+
+.dreelio-landing .plan-card {
+  padding: 36px 24px 32px;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: var(--card);
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.15s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+}
+.dreelio-landing .plan-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--sh-md);
+  transform: translateY(-3px);
+}
+.dreelio-landing .plan-card.is-selected {
+  border-color: var(--accent);
+  background: rgba(0,52,97,0.04);
+  box-shadow: var(--sh-md);
+}
+.dreelio-landing .plan-card-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,52,97,0.08);
+  margin-bottom: 18px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.dreelio-landing .plan-card:hover .plan-card-icon,
+.dreelio-landing .plan-card.is-selected .plan-card-icon {
+  background: var(--accent);
+}
+.dreelio-landing .plan-card-icon .ms {
+  font-size: 28px;
+  color: var(--accent);
+  transition: color 0.2s;
+}
+.dreelio-landing .plan-card:hover .plan-card-icon .ms,
+.dreelio-landing .plan-card.is-selected .plan-card-icon .ms { color: #fff; }
+.dreelio-landing .plan-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+.dreelio-landing .plan-card-desc {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+/* ─ Option cards (funding step 1) ───────────────────────────── */
+.dreelio-landing .option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 40px;
+}
+@media (max-width: 540px) {
+  .dreelio-landing .option-grid { grid-template-columns: 1fr; }
+}
+
+.dreelio-landing .option-card {
+  padding: 28px;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+}
+.dreelio-landing .option-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--sh-md);
+}
+.dreelio-landing .option-card.is-selected {
+  border-color: var(--accent);
+  background: rgba(0,52,97,0.04);
+}
+.dreelio-landing .option-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,52,97,0.08);
+  margin-bottom: 16px;
+  transition: background 0.2s;
+}
+.dreelio-landing .option-card.is-selected .option-card-icon { background: var(--accent); }
+.dreelio-landing .option-card-icon .ms { font-size: 22px; color: var(--accent); transition: color 0.2s; }
+.dreelio-landing .option-card.is-selected .option-card-icon .ms { color: #fff; }
+.dreelio-landing .option-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.dreelio-landing .option-card-desc {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+/* ─ Upload cards (step 2) ────────────────────────────────────── */
+.dreelio-landing .upload-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 32px;
+}
+@media (max-width: 700px) {
+  .dreelio-landing .upload-grid { grid-template-columns: 1fr; }
+}
+
+.dreelio-landing .upload-card {
+  border-radius: var(--r-lg);
+  border: 2px dashed rgba(0,52,97,0.25);
+  background: var(--card);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px;
+  gap: 10px;
+  min-height: 200px;
+  justify-content: center;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.15s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+  width: 100%;
+}
+.dreelio-landing .upload-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--sh-sm);
+  transform: translateY(-2px);
+}
+.dreelio-landing .upload-card.is-dragging {
+  border-style: solid;
+  border-color: var(--accent);
+  background: rgba(0,52,97,0.04);
+  transform: scale(1.02);
+}
+.dreelio-landing .upload-card.is-uploaded {
+  border-style: solid;
+  border-color: var(--emerald);
+  background: #f0fdf4;
+  cursor: default;
+}
+.dreelio-landing .upload-card.is-demo {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+.dreelio-landing .upload-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,52,97,0.08);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.dreelio-landing .upload-card:hover .upload-card-icon,
+.dreelio-landing .upload-card.is-dragging .upload-card-icon { background: var(--accent); }
+.dreelio-landing .upload-card.is-uploaded .upload-card-icon { background: #dcfce7; }
+.dreelio-landing .upload-card-icon .ms { font-size: 24px; color: var(--accent); transition: color 0.2s; }
+.dreelio-landing .upload-card:hover .upload-card-icon .ms,
+.dreelio-landing .upload-card.is-dragging .upload-card-icon .ms { color: #fff; }
+.dreelio-landing .upload-card.is-uploaded .upload-card-icon .ms { color: var(--emerald); }
+
+/* Demo case selector pill row */
+.dreelio-landing .demo-case-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.dreelio-landing .demo-case-pill {
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--line-strong);
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+}
+.dreelio-landing .demo-case-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.dreelio-landing .demo-case-pill.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Wizard bottom nav */
+.dreelio-landing .wizard-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 48px;
+  flex-wrap: wrap;
+}
+
+/* Processing view */
+.dreelio-landing .processing-shell {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: clamp(60px,8vw,100px) 24px;
+  text-align: center;
+}
+.dreelio-landing .processing-card {
+  background: var(--card);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--sh-md);
+  margin-top: 8px;
+  text-align: left;
+}
+.dreelio-landing .processing-bar-track {
+  height: 4px;
+  background: rgba(0,52,97,0.1);
+}
+.dreelio-landing .processing-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.5s var(--ease);
+}
+.dreelio-landing .processing-stages {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dreelio-landing .stage-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transition: opacity 0.3s;
+}
+.dreelio-landing .stage-row.is-pending { opacity: 0.3; }
+.dreelio-landing .stage-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,52,97,0.2);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+@keyframes wizSpin { to { transform: rotate(360deg); } }
+.dreelio-landing .wiz-spin { display: inline-block; animation: wizSpin 1s linear infinite; }

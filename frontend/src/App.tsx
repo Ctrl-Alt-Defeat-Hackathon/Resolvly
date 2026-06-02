@@ -3,6 +3,7 @@ import ScrollToTop from './components/ScrollToTop'
 import LandingPage from './pages/LandingPage'
 import MarketingResourcesPage from './pages/MarketingResourcesPage'
 import AnalyzeFlow from './pages/AnalyzeFlow'
+import DemoFlow from './pages/DemoFlow'
 import ActionPlan from './pages/ActionPlan'
 import BillBreakdown from './pages/BillBreakdown'
 import AppealDrafting from './pages/AppealDrafting'
@@ -19,6 +20,7 @@ function App() {
         <Route path="/resources" element={<MarketingResourcesPage />} />
         <Route path="/upload-wizard" element={<Navigate to="/analyze" replace />} />
         <Route path="/analyze" element={<AnalyzeFlow />} />
+        <Route path="/demo" element={<DemoFlow />} />
         <Route path="/action-plan" element={<ActionPlan />} />
         <Route path="/bill-breakdown" element={<BillBreakdown />} />
         <Route path="/appeal-drafting" element={<AppealDrafting />} />
