@@ -33,4 +33,8 @@ docker-compose.override.yml
 
 # Local frontend backup snapshot (not shipped with the app)
 frontend.local.bak
+
+# Planning & design docs (local only — see docs/V2_ROADMAP.md)
+docs/
+
 .DS_Store

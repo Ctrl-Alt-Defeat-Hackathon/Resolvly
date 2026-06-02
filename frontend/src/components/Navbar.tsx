@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, type MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { clearAllOutputsCache } from '../lib/outputsCache'
 import { clearAnalysisSession, hasActiveAnalysis } from '../lib/sessionKeys'
+import { scrollToPageTop } from '../lib/pageScroll'
 
 type NavItem = { label: string; to: string; icon: string }
 
@@ -40,6 +41,16 @@ export default function Navbar() {
     navigate('/')
   }
 
+  function handleLogoClick(e: MouseEvent<HTMLAnchorElement>) {
+    if (pathname === '/') {
+      e.preventDefault()
+      if (window.location.hash) {
+        window.history.replaceState(null, '', '/')
+      }
+      scrollToPageTop('smooth')
+    }
+  }
+
   return (
     <>
       <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm">
@@ -53,7 +64,7 @@ export default function Navbar() {
               Resolvly
             </button>
           ) : (
-            <Link to="/" className="text-2xl font-bold tracking-tighter text-sky-900 font-headline">
+            <Link to="/" onClick={handleLogoClick} className="text-2xl font-bold tracking-tighter text-sky-900 font-headline">
               Resolvly
             </Link>
           )}

@@ -1,0 +1,327 @@
+/* dreelio-landing.css — Dreelio design language for Resolvly landing page
+   All utility class selectors are scoped under .dreelio-landing to avoid
+   conflicts with the existing Tailwind/Material Design token system. */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap');
+
+/* ====================================================================
+   CSS VARIABLES — new names, no conflict with existing --color-* vars
+   ==================================================================== */
+:root {
+  --canvas:         #efe8db;
+  --canvas-soft:    #f4eee3;
+  --canvas-deep:    #e7dfcf;
+  --card:           #fbf8f1;
+  --card-pure:      #ffffff;
+
+  --ink:            #211d16;
+  --ink-2:          #6a6356;
+  --ink-3:          #9c9484;
+  --line:           rgba(33,29,22,0.10);
+  --line-strong:    rgba(33,29,22,0.16);
+
+  --accent:         #003461;
+  --accent-2:       #004b87;
+  --accent-ink:     #ffffff;
+  --accent-soft:    #cbe7f5;
+  --accent-soft-ink:#1d4f6b;
+  --accent-tint:    rgba(0,52,97,0.06);
+
+  --dark:           #14110b;
+  --dark-card:      #1d1910;
+  --dark-ink:       #f3ede1;
+  --dark-ink-2:     #b3ab98;
+
+  --amber:          #f5ac00;
+  --amber-bg:       #ffdeac;
+  --amber-ink:      #5c4300;
+  --emerald:        #059669;
+  --emerald-bg:     #d1fae5;
+  --emerald-ink:    #064e3b;
+  --error:          #ba1a1a;
+  --error-bg:       #ffdad6;
+  --error-ink:      #93000a;
+
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --r-pill: 9999px;
+  --r-xl:   28px;
+  --r-lg:   20px;
+  --r-md:   14px;
+  --r-sm:   10px;
+
+  --sh-sm:   0 1px 2px rgba(33,29,22,0.05);
+  --sh-md:   0 6px 16px rgba(33,29,22,0.06), 0 2px 4px rgba(33,29,22,0.04);
+  --sh-lg:   0 18px 40px rgba(33,29,22,0.10), 0 4px 10px rgba(33,29,22,0.05);
+  --sh-xl:   0 32px 64px rgba(33,29,22,0.14), 0 8px 20px rgba(33,29,22,0.06);
+  --sh-navy: 0 20px 48px rgba(0,52,97,0.28);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dark theme (marketing pages only) */
+.dreelio-landing.dreelio-dark {
+  --canvas:         #12100c;
+  --canvas-soft:    #18150f;
+  --canvas-deep:    #0e0c08;
+  --card:           #1c1914;
+  --card-pure:      #242019;
+
+  --ink:            #f3ede1;
+  --ink-2:          #b3ab98;
+  --ink-3:          #8a8274;
+  --line:           rgba(255, 255, 255, 0.08);
+  --line-strong:    rgba(255, 255, 255, 0.14);
+
+  --accent-soft:    rgba(163, 201, 255, 0.14);
+  --accent-soft-ink:#8abcff;
+  --accent-tint:    rgba(163, 201, 255, 0.08);
+
+  --sh-sm:   0 1px 2px rgba(0, 0, 0, 0.35);
+  --sh-md:   0 6px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --sh-lg:   0 18px 40px rgba(0, 0, 0, 0.45), 0 4px 10px rgba(0, 0, 0, 0.3);
+  --sh-xl:   0 32px 64px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.dreelio-landing.dreelio-dark .btn-ghost {
+  background: var(--card-pure);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.dreelio-landing.dreelio-dark nav[style*="rgba(251,248,241"] {
+  background: rgba(28, 25, 20, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ====================================================================
+   MATERIAL SYMBOLS HELPER — new class, no conflict with .material-symbols-outlined
+   ==================================================================== */
+.ms {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  line-height: 1;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'liga';
+  vertical-align: middle;
+  user-select: none;
+}
+.ms.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+/* ====================================================================
+   KEYFRAMES — prefixed to avoid collisions
+   ==================================================================== */
+@keyframes dl-marquee { to { transform: translateX(-50%); } }
+@keyframes dl-tabfade { from { transform: translateY(10px); } to { transform: none; } }
+@keyframes dl-devswap { from { opacity: .4; transform: scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes dl-bob     { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes dl-page-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Cross-page fade (View Transitions API) */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root) {
+    animation: dl-vt-out 0.38s var(--ease) both;
+  }
+  ::view-transition-new(root) {
+    animation: dl-vt-in 0.42s var(--ease) both;
+  }
+}
+@keyframes dl-vt-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.985); }
+}
+@keyframes dl-vt-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+.dreelio-landing .marketing-page-enter {
+  animation: dl-page-in 0.55s var(--ease) both;
+}
+
+/* Offset fixed nav when scrolling to in-page sections */
+.dreelio-landing #top,
+.dreelio-landing #pipeline,
+.dreelio-landing #features,
+.dreelio-landing #trust {
+  scroll-margin-top: 96px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ====================================================================
+   SCOPED UTILITIES — all under .dreelio-landing
+   ==================================================================== */
+
+/* Layout */
+.dreelio-landing .wrap      { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
+.dreelio-landing .wrap-wide { max-width: 1320px; margin: 0 auto; padding: 0 28px; }
+
+/* Typography */
+.dreelio-landing .eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--accent);
+  background: var(--card); border: 1px solid var(--line);
+  padding: 6px 14px 6px 12px; border-radius: var(--r-pill);
+  box-shadow: var(--sh-sm); letter-spacing: -0.01em;
+}
+.dreelio-landing .eyebrow .dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+}
+.dreelio-landing .display { font-size: clamp(40px, 6vw, 76px); font-weight: 800; letter-spacing: -0.035em; line-height: 0.98; }
+.dreelio-landing .h-xl    { font-size: clamp(34px, 4.4vw, 56px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; }
+.dreelio-landing .h-lg    { font-size: clamp(26px, 2.6vw, 36px); font-weight: 700; letter-spacing: -0.025em; }
+.dreelio-landing .lead    { font-size: clamp(17px, 1.5vw, 20px); line-height: 1.55; color: var(--ink-2); font-weight: 400; }
+.dreelio-landing .body    { font-size: 16px; line-height: 1.6; color: var(--ink-2); }
+.dreelio-landing .muted   { color: var(--ink-2); }
+
+/* Buttons */
+.dreelio-landing .btn {
+  font-family: var(--font); font-weight: 600; font-size: 15px;
+  border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 24px; border-radius: var(--r-pill); white-space: nowrap;
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease), background .2s, opacity .2s;
+  text-decoration: none; line-height: 1;
+}
+.dreelio-landing .btn-primary { background: var(--accent); color: #fff; box-shadow: var(--sh-md); }
+.dreelio-landing .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--sh-lg); background: var(--accent-2); }
+.dreelio-landing .btn-ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: var(--sh-sm); }
+.dreelio-landing .btn-ghost:hover { transform: translateY(-2px); box-shadow: var(--sh-md); background: var(--card-pure); }
+.dreelio-landing .btn-light { background: rgba(255,255,255,0.12); color: var(--dark-ink); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(6px); }
+.dreelio-landing .btn-light:hover { background: rgba(255,255,255,0.2); }
+.dreelio-landing .btn-on-dark { background: #fff; color: var(--accent); box-shadow: var(--sh-lg); }
+.dreelio-landing .btn-on-dark:hover { transform: translateY(-2px); }
+.dreelio-landing .btn:hover .ms.arrow { transform: translateX(3px); }
+
+/* Cards */
+.dreelio-landing .card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--sh-sm);
+}
+.dreelio-landing .card-hover { transition: transform .3s var(--ease), box-shadow .3s var(--ease); }
+.dreelio-landing .card-hover:hover { transform: translateY(-5px); box-shadow: var(--sh-lg); }
+
+/* Chips */
+.dreelio-landing .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: var(--r-pill);
+  background: var(--accent-soft); color: var(--accent-soft-ink); letter-spacing: -0.01em;
+}
+
+/* Section rhythm */
+.dreelio-landing .section       { padding: clamp(72px, 10vw, 128px) 0; }
+.dreelio-landing .section-tight { padding: clamp(48px, 6vw, 80px) 0; }
+
+/* Scroll reveal */
+.dreelio-landing .reveal { opacity: 0; transform: translateY(28px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+.dreelio-landing .reveal.is-in { opacity: 1; transform: none; }
+.dreelio-landing .reveal-d1 { transition-delay: .08s; }
+.dreelio-landing .reveal-d2 { transition-delay: .16s; }
+.dreelio-landing .reveal-d3 { transition-delay: .24s; }
+.dreelio-landing .reveal-d4 { transition-delay: .32s; }
+.dreelio-landing .reveal-d5 { transition-delay: .40s; }
+
+/* Marquee */
+.dreelio-landing .marquee {
+  overflow: hidden; position: relative;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.dreelio-landing .marquee-track {
+  display: flex; width: max-content;
+  animation: dl-marquee var(--mq-dur, 36s) linear infinite;
+}
+.dreelio-landing .marquee:hover .marquee-track { animation-play-state: paused; }
+
+/* Animations */
+.dreelio-landing .tab-copy, .dreelio-landing .tab-screen { animation: dl-tabfade .45s var(--ease); }
+.dreelio-landing .device-swap { animation: dl-devswap .45s var(--ease); }
+
+/* Deck stack */
+.dreelio-landing .deck { overflow: hidden; }
+.dreelio-landing .deck-card {
+  transition: transform .55s var(--ease), opacity .5s var(--ease),
+              filter .5s var(--ease), visibility .5s;
+}
+
+/* Nav link hover */
+.dreelio-landing .nav-link {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 2px;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), font-weight 0.2s var(--ease);
+}
+
+.dreelio-landing .nav-link:hover,
+.dreelio-landing .nav-link.is-active {
+  color: var(--accent) !important;
+}
+
+.dreelio-landing .nav-link.is-active {
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+
+/* ====================================================================
+   REDUCED MOTION
+   ==================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .dreelio-landing .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .dreelio-landing .marquee-track { animation: none !important; }
+  .dreelio-landing .btn:hover, .dreelio-landing .card-hover:hover { transform: none !important; }
+  .dreelio-landing .device-swap,
+  .dreelio-landing .tab-copy,
+  .dreelio-landing .tab-screen { animation: none !important; }
+  .dreelio-landing .deck-card { transition: none !important; }
+}
+
+/* ====================================================================
+   RESPONSIVE BREAKPOINTS
+   ==================================================================== */
+@media (max-width: 980px) {
+  .dreelio-landing .wrap, .dreelio-landing .wrap-wide { padding: 0 20px; }
+  .dreelio-landing .hero-split    { grid-template-columns: 1fr !important; }
+  .dreelio-landing .tabs-card     { grid-template-columns: 1fr !important; }
+  .dreelio-landing .bento-top     { grid-template-columns: 1fr !important; }
+  .dreelio-landing .resources-grid{ grid-template-columns: 1fr !important; }
+  .dreelio-landing .cta-grid      { grid-template-columns: 1fr !important; }
+  .dreelio-landing .deck          { height: min(64vh, 480px) !important; }
+  .dreelio-landing .bento-bottom  { grid-template-columns: 1fr 1fr !important; }
+  .dreelio-landing .footer-grid   { grid-template-columns: 1fr 1fr !important; }
+  .dreelio-landing .nav-links     { display: none !important; }
+  .dreelio-landing .tabs-card > div:last-child {
+    border-left: none !important;
+    border-top: 1px solid var(--line) !important;
+  }
+  .dreelio-landing .pipeline-scroller {
+    height: auto !important;
+    padding-bottom: clamp(48px, 8vw, 96px);
+  }
+  .dreelio-landing .pipeline-sticky {
+    position: static !important;
+    min-height: 0 !important;
+  }
+  .dreelio-landing .pipeline-hint { display: none !important; }
+}
+
+@media (max-width: 640px) {
+  .dreelio-landing .bento-bottom { grid-template-columns: 1fr !important; }
+  .dreelio-landing .footer-grid  { grid-template-columns: 1fr !important; }
+  .dreelio-landing .hero-art     { display: none; }
+}

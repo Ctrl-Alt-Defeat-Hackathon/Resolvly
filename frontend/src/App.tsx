@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ScrollToTop from './components/ScrollToTop'
 import LandingPage from './pages/LandingPage'
+import MarketingResourcesPage from './pages/MarketingResourcesPage'
 import AnalyzeFlow from './pages/AnalyzeFlow'
 import ActionPlan from './pages/ActionPlan'
 import BillBreakdown from './pages/BillBreakdown'
@@ -15,6 +16,7 @@ function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/resources" element={<MarketingResourcesPage />} />
         <Route path="/upload-wizard" element={<Navigate to="/analyze" replace />} />
         <Route path="/analyze" element={<AnalyzeFlow />} />
         <Route path="/action-plan" element={<ActionPlan />} />
