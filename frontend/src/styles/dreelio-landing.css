@@ -624,6 +624,7 @@
   .dreelio-landing .bento-top     { grid-template-columns: 1fr !important; }
   .dreelio-landing .resources-grid{ grid-template-columns: 1fr !important; }
   .dreelio-landing .cta-grid      { grid-template-columns: 1fr !important; }
+  .dreelio-landing .cta-mock      { display: none !important; }
   .dreelio-landing .deck          { height: min(64vh, 480px) !important; }
   .dreelio-landing .bento-bottom  { grid-template-columns: 1fr 1fr !important; }
   .dreelio-landing .footer-grid   { grid-template-columns: 1fr 1fr !important; }

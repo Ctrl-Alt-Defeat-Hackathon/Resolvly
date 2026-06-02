@@ -672,7 +672,17 @@ function FeatureTabs() {
   const [progress, setProgress] = useState(0)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const stepRefs = useRef<(HTMLElement | null)[]>([])
+  const navRef = useRef<HTMLElement>(null)
   const isMobile = usePipelineMobileLayout()
+
+  // Scroll the active tab to center in the mobile nav strip
+  useEffect(() => {
+    if (!isMobile || !navRef.current) return
+    const nav = navRef.current
+    const btn = nav.children[active] as HTMLElement | undefined
+    if (!btn) return
+    nav.scrollTo({ left: btn.offsetLeft - (nav.offsetWidth - btn.offsetWidth) / 2, behavior: 'smooth' })
+  }, [active, isMobile])
 
   useEffect(() => {
     if (isMobile) return
@@ -768,7 +778,7 @@ function FeatureTabs() {
       <section id="pipeline" style={{ background: 'var(--canvas-soft)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         {pipelineIntro}
         <div className="wrap-wide pipeline-mobile" style={{ paddingBottom: 'clamp(48px, 8vw, 96px)' }}>
-          <nav className="pipeline-mobile-nav" aria-label="Pipeline steps">
+          <nav ref={navRef} className="pipeline-mobile-nav" aria-label="Pipeline steps">
             {CARDS.map((c, i) => {
               const on = i === active
               const done = i < active
@@ -986,7 +996,7 @@ function CTABanner({ onStart }: { onStart: () => void }) {
       <div className="wrap-wide">
         <Reveal style={{ position: 'relative', borderRadius: 'var(--r-xl)', background: 'linear-gradient(150deg, #003461, #00253f)', overflow: 'hidden', padding: 'clamp(40px,6vw,72px)' }}>
           <span className="ms" style={{ position: 'absolute', left: -30, bottom: -40, fontSize: 240, color: 'rgba(255,255,255,0.05)' }}>balance</span>
-          <div className="cta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'center', position: 'relative' }}>
+          <div className="cta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'clamp(24px,4vw,48px)', alignItems: 'center', position: 'relative' }}>
             <div>
               <h2 className="h-xl" style={{ color: '#fff', margin: '0 0 16px' }}>Ready to push back?</h2>
               <p className="lead" style={{ color: '#b8d4ec', maxWidth: 440, margin: '0 0 28px' }}>
@@ -1004,7 +1014,7 @@ function CTABanner({ onStart }: { onStart: () => void }) {
                 <span className="ms fill" style={{ fontSize: 17 }}>lock</span> Empowering every Hoosier with the tools to push back.
               </div>
             </div>
-            <div style={{ position: 'relative' }}>
+            <div className="cta-mock" style={{ position: 'relative' }}>
               <div style={{ transform: 'perspective(1400px) rotateY(-8deg)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--sh-navy)' }}>
                 <BrowserFrame url="app.resolvly.com/action-plan"><FauxDashboard /></BrowserFrame>
               </div>
