@@ -1,0 +1,1222 @@
+/* dreelio-landing.css — Dreelio design language for Resolvly landing page
+   All utility class selectors are scoped under .dreelio-landing to avoid
+   conflicts with the existing Tailwind/Material Design token system. */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap');
+
+/* ====================================================================
+   CSS VARIABLES — new names, no conflict with existing --color-* vars
+   ==================================================================== */
+:root {
+  --canvas:         #efe8db;
+  --canvas-soft:    #f4eee3;
+  --canvas-deep:    #e7dfcf;
+  --card:           #fbf8f1;
+  --card-pure:      #ffffff;
+
+  --ink:            #211d16;
+  --ink-2:          #6a6356;
+  --ink-3:          #9c9484;
+  --line:           rgba(33,29,22,0.10);
+  --line-strong:    rgba(33,29,22,0.16);
+
+  --accent:         #003461;
+  --accent-2:       #004b87;
+  --accent-ink:     #ffffff;
+  --accent-soft:    #cbe7f5;
+  --accent-soft-ink:#1d4f6b;
+  --accent-tint:    rgba(0,52,97,0.06);
+
+  --dark:           #14110b;
+  --dark-card:      #1d1910;
+  --dark-ink:       #f3ede1;
+  --dark-ink-2:     #b3ab98;
+
+  --amber:          #f5ac00;
+  --amber-bg:       #ffdeac;
+  --amber-ink:      #5c4300;
+  --emerald:        #059669;
+  --emerald-bg:     #d1fae5;
+  --emerald-ink:    #064e3b;
+  --error:          #ba1a1a;
+  --error-bg:       #ffdad6;
+  --error-ink:      #93000a;
+
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --r-pill: 9999px;
+  --r-xl:   28px;
+  --r-lg:   20px;
+  --r-md:   14px;
+  --r-sm:   10px;
+
+  --sh-sm:   0 1px 2px rgba(33,29,22,0.05);
+  --sh-md:   0 6px 16px rgba(33,29,22,0.06), 0 2px 4px rgba(33,29,22,0.04);
+  --sh-lg:   0 18px 40px rgba(33,29,22,0.10), 0 4px 10px rgba(33,29,22,0.05);
+  --sh-xl:   0 32px 64px rgba(33,29,22,0.14), 0 8px 20px rgba(33,29,22,0.06);
+  --sh-navy: 0 20px 48px rgba(0,52,97,0.28);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dark theme (marketing pages only) */
+.dreelio-landing.dreelio-dark {
+  --canvas:         #12100c;
+  --canvas-soft:    #18150f;
+  --canvas-deep:    #0e0c08;
+  --card:           #1c1914;
+  --card-pure:      #242019;
+
+  --ink:            #f3ede1;
+  --ink-2:          #b3ab98;
+  --ink-3:          #8a8274;
+  --line:           rgba(255, 255, 255, 0.08);
+  --line-strong:    rgba(255, 255, 255, 0.14);
+
+  --accent-soft:    rgba(163, 201, 255, 0.14);
+  --accent-soft-ink:#8abcff;
+  --accent-tint:    rgba(163, 201, 255, 0.08);
+
+  --sh-sm:   0 1px 2px rgba(0, 0, 0, 0.35);
+  --sh-md:   0 6px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --sh-lg:   0 18px 40px rgba(0, 0, 0, 0.45), 0 4px 10px rgba(0, 0, 0, 0.3);
+  --sh-xl:   0 32px 64px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.dreelio-landing.dreelio-dark .btn-ghost {
+  background: var(--card-pure);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.dreelio-landing.dreelio-dark nav[style*="rgba(251,248,241"] {
+  background: rgba(28, 25, 20, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ====================================================================
+   MATERIAL SYMBOLS HELPER — new class, no conflict with .material-symbols-outlined
+   ==================================================================== */
+.ms {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  line-height: 1;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'liga';
+  vertical-align: middle;
+  user-select: none;
+}
+.ms.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+/* ====================================================================
+   KEYFRAMES — prefixed to avoid collisions
+   ==================================================================== */
+@keyframes dl-marquee { to { transform: translateX(-50%); } }
+@keyframes dl-marquee-reverse { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+@keyframes dl-tabfade { from { transform: translateY(10px); } to { transform: none; } }
+@keyframes dl-devswap { from { opacity: .4; transform: scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes dl-bob     { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes dl-page-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Cross-page fade (View Transitions API) */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root) {
+    animation: dl-vt-out 0.38s var(--ease) both;
+  }
+  ::view-transition-new(root) {
+    animation: dl-vt-in 0.42s var(--ease) both;
+  }
+}
+@keyframes dl-vt-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.985); }
+}
+@keyframes dl-vt-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+.dreelio-landing .marketing-page-enter {
+  animation: dl-page-in 0.55s var(--ease) both;
+}
+
+/* Offset fixed nav when scrolling to in-page sections */
+.dreelio-landing #top,
+.dreelio-landing #pipeline,
+.dreelio-landing #features,
+.dreelio-landing #trust {
+  scroll-margin-top: 96px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ====================================================================
+   SCOPED UTILITIES — all under .dreelio-landing
+   ==================================================================== */
+
+/* Layout */
+.dreelio-landing .wrap      { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
+.dreelio-landing .wrap-wide { max-width: 1320px; margin: 0 auto; padding: 0 28px; }
+
+/* Typography */
+.dreelio-landing .eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--accent);
+  background: var(--card); border: 1px solid var(--line);
+  padding: 6px 14px 6px 12px; border-radius: var(--r-pill);
+  box-shadow: var(--sh-sm); letter-spacing: -0.01em;
+}
+.dreelio-landing .eyebrow .dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+}
+.dreelio-landing .display { font-size: clamp(40px, 6vw, 76px); font-weight: 800; letter-spacing: -0.035em; line-height: 0.98; }
+.dreelio-landing .h-xl    { font-size: clamp(34px, 4.4vw, 56px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; }
+.dreelio-landing .h-lg    { font-size: clamp(26px, 2.6vw, 36px); font-weight: 700; letter-spacing: -0.025em; }
+.dreelio-landing .lead    { font-size: clamp(17px, 1.5vw, 20px); line-height: 1.55; color: var(--ink-2); font-weight: 400; }
+.dreelio-landing .body    { font-size: 16px; line-height: 1.6; color: var(--ink-2); }
+.dreelio-landing .muted   { color: var(--ink-2); }
+
+/* Buttons */
+.dreelio-landing .btn {
+  font-family: var(--font); font-weight: 600; font-size: 15px;
+  border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 24px; border-radius: var(--r-pill); white-space: nowrap;
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease), background .2s, opacity .2s;
+  text-decoration: none; line-height: 1;
+}
+.dreelio-landing .btn-primary { background: var(--accent); color: #fff; box-shadow: var(--sh-md); }
+.dreelio-landing .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--sh-lg); background: var(--accent-2); }
+.dreelio-landing .btn-ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: var(--sh-sm); }
+.dreelio-landing .btn-ghost:hover { transform: translateY(-2px); box-shadow: var(--sh-md); background: var(--card-pure); }
+.dreelio-landing .btn-light { background: rgba(255,255,255,0.12); color: var(--dark-ink); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(6px); }
+.dreelio-landing .btn-light:hover { background: rgba(255,255,255,0.2); }
+.dreelio-landing .btn-on-dark { background: #fff; color: var(--accent); box-shadow: var(--sh-lg); }
+.dreelio-landing .btn-on-dark:hover { transform: translateY(-2px); }
+.dreelio-landing .btn:hover .ms.arrow { transform: translateX(3px); }
+
+/* Cards */
+.dreelio-landing .card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--sh-sm);
+}
+.dreelio-landing .card-hover { transition: transform .3s var(--ease), box-shadow .3s var(--ease); }
+.dreelio-landing .card-hover:hover { transform: translateY(-5px); box-shadow: var(--sh-lg); }
+
+/* Chips */
+.dreelio-landing .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: var(--r-pill);
+  background: var(--accent-soft); color: var(--accent-soft-ink); letter-spacing: -0.01em;
+}
+
+/* Section rhythm */
+.dreelio-landing .section       { padding: clamp(72px, 10vw, 128px) 0; }
+.dreelio-landing .section-tight { padding: clamp(48px, 6vw, 80px) 0; }
+
+/* Scroll reveal */
+.dreelio-landing .reveal { opacity: 0; transform: translateY(28px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+.dreelio-landing .reveal.is-in { opacity: 1; transform: none; }
+.dreelio-landing .reveal-d1 { transition-delay: .08s; }
+.dreelio-landing .reveal-d2 { transition-delay: .16s; }
+.dreelio-landing .reveal-d3 { transition-delay: .24s; }
+.dreelio-landing .reveal-d4 { transition-delay: .32s; }
+.dreelio-landing .reveal-d5 { transition-delay: .40s; }
+
+/* Marquee */
+.dreelio-landing .marquee {
+  overflow: hidden; position: relative;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.dreelio-landing .marquee-track {
+  display: flex; width: max-content;
+  animation: dl-marquee var(--mq-dur, 36s) linear infinite;
+}
+.dreelio-landing .marquee:hover .marquee-track { animation-play-state: paused; }
+
+/* Source logos — dual-row opposing marquees */
+.dreelio-landing .sources-card {
+  overflow: hidden;
+}
+
+.dreelio-landing .sources-marquee {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 calc(-1 * clamp(8px, 2vw, 16px));
+}
+
+.dreelio-landing .sources-marquee-row {
+  --mq-dur: 34s;
+}
+
+.dreelio-landing .sources-marquee-row--reverse .marquee-track {
+  animation: dl-marquee-reverse var(--mq-dur, 38s) linear infinite;
+}
+
+.dreelio-landing .sources-marquee-track {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: max-content;
+}
+
+.dreelio-landing .sources-marquee-item {
+  flex: 0 0 auto;
+  width: clamp(96px, 22vw, 118px);
+}
+
+.dreelio-landing .source-logo-tile {
+  aspect-ratio: 1.55;
+  width: 100%;
+  border-radius: var(--r-md);
+  background: var(--card-pure);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  box-sizing: border-box;
+}
+
+.dreelio-landing .source-logo-tile-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: -0.01em;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
+/* Animations */
+.dreelio-landing .tab-copy, .dreelio-landing .tab-screen { animation: dl-tabfade .45s var(--ease); }
+.dreelio-landing .device-swap { animation: dl-devswap .45s var(--ease); }
+
+/* Deck stack */
+.dreelio-landing .deck { overflow: hidden; }
+.dreelio-landing .deck-card {
+  transition: transform .55s var(--ease), opacity .5s var(--ease),
+              filter .5s var(--ease), visibility .5s;
+}
+
+/* Pipeline — mobile stacked steps */
+.dreelio-landing .pipeline-mobile-nav {
+  position: sticky;
+  top: 72px;
+  z-index: 12;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px;
+  margin: 0 0 28px;
+  background: rgba(251, 248, 241, 0.92);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-md);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.dreelio-landing .pipeline-mobile-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background 0.3s var(--ease), color 0.3s var(--ease), transform 0.3s var(--ease);
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+  transform: scale(1.02);
+  box-shadow: var(--sh-md);
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn.is-done:not(.is-active) {
+  color: var(--ink-2);
+}
+
+.dreelio-landing .pipeline-mobile-nav-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-pure);
+  color: var(--accent);
+  border: 1px solid var(--line-strong);
+  transition: background 0.3s var(--ease), color 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+
+.dreelio-landing .pipeline-mobile-nav-btn.is-active .pipeline-mobile-nav-icon {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.dreelio-landing .pipeline-mobile-nav-label {
+  white-space: nowrap;
+}
+
+.dreelio-landing .pipeline-mobile-step {
+  scroll-margin-top: 148px;
+  margin-bottom: clamp(40px, 8vw, 64px);
+  opacity: 0.42;
+  transform: translateY(28px);
+  transition: opacity 0.55s var(--ease), transform 0.55s var(--ease);
+}
+
+.dreelio-landing .pipeline-mobile-step.is-active,
+.dreelio-landing .pipeline-mobile-step.is-past {
+  transform: none;
+}
+
+.dreelio-landing .pipeline-mobile-step.is-active {
+  opacity: 1;
+}
+
+.dreelio-landing .pipeline-mobile-step.is-past:not(.is-active) {
+  opacity: 0.78;
+}
+
+.dreelio-landing .pipeline-mobile-step-copy {
+  margin-bottom: 20px;
+}
+
+.dreelio-landing .pipeline-mobile-step-screen {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--sh-lg);
+}
+
+.dreelio-landing .pipeline-mobile-step.is-active .pipeline-mobile-step-screen {
+  animation: dl-tabfade 0.5s var(--ease);
+}
+
+.dreelio-landing.dreelio-dark .pipeline-mobile-nav {
+  background: rgba(28, 25, 20, 0.92);
+}
+
+/* Nav link hover */
+.dreelio-landing .nav-link {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 2px;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), font-weight 0.2s var(--ease);
+}
+
+.dreelio-landing .nav-link:hover,
+.dreelio-landing .nav-link.is-active {
+  color: var(--accent) !important;
+}
+
+.dreelio-landing .nav-link.is-active {
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* Marketing nav bar */
+.dreelio-landing .dreelio-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1320px;
+  height: 76px;
+  padding: 0 28px;
+  border-radius: 0;
+  background: rgba(239, 232, 219, 0);
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: max-width 0.45s var(--ease), height 0.45s var(--ease), padding 0.45s var(--ease),
+    border-radius 0.45s var(--ease), background 0.45s var(--ease), box-shadow 0.45s var(--ease),
+    border-color 0.45s var(--ease), backdrop-filter 0.45s var(--ease);
+  position: relative;
+}
+
+.dreelio-landing .dreelio-nav-bar.is-scrolled,
+.dreelio-landing .dreelio-nav-bar.is-menu-open {
+  max-width: 880px;
+  height: 60px;
+  padding: 0 12px 0 24px;
+  border-radius: var(--r-pill);
+  background: rgba(251, 248, 241, 0.72);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--sh-lg);
+}
+
+.dreelio-landing .nav-links-desktop {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.dreelio-landing .nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.dreelio-landing .nav-logo-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.06em;
+}
+
+.dreelio-landing .nav-logo-word {
+  font-weight: 800;
+  font-size: 21px;
+  color: var(--accent);
+  letter-spacing: -0.045em;
+}
+
+.dreelio-landing .nav-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.dreelio-landing .nav-mobile-toggle:hover {
+  background: rgba(33, 29, 22, 0.06);
+}
+
+.dreelio-landing .nav-menu-icon {
+  width: 22px;
+  height: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dreelio-landing .nav-menu-icon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+}
+
+.dreelio-landing .nav-menu-icon.is-open span:first-child {
+  transform: translateY(5px) rotate(45deg);
+}
+
+.dreelio-landing .nav-menu-icon.is-open span:last-child {
+  transform: translateY(-5px) rotate(-45deg);
+}
+
+.dreelio-landing .mobile-nav-backdrop {
+  display: none;
+}
+
+@keyframes mobile-nav-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mobile-nav-stack-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dreelio-landing.dreelio-dark .dreelio-nav-bar.is-scrolled,
+.dreelio-landing.dreelio-dark .dreelio-nav-bar.is-menu-open {
+  background: rgba(28, 25, 20, 0.82);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ====================================================================
+   REDUCED MOTION
+   ==================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .dreelio-landing .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .dreelio-landing .marquee-track { animation: none !important; }
+  .dreelio-landing .sources-marquee-row--reverse .marquee-track { animation: none !important; }
+  .dreelio-landing .btn:hover, .dreelio-landing .card-hover:hover { transform: none !important; }
+  .dreelio-landing .device-swap,
+  .dreelio-landing .tab-copy,
+  .dreelio-landing .tab-screen { animation: none !important; }
+  .dreelio-landing .deck-card { transition: none !important; }
+  .dreelio-landing .pipeline-mobile-step,
+  .dreelio-landing .pipeline-mobile-nav-btn { transition: none !important; }
+  .dreelio-landing .pipeline-mobile-step.is-active .pipeline-mobile-step-screen { animation: none !important; }
+  .dreelio-landing .mobile-nav-backdrop,
+  .dreelio-landing .mobile-nav-stack { animation: none !important; }
+  .dreelio-landing .nav-menu-icon span { transition: none !important; }
+}
+
+/* ====================================================================
+   RESPONSIVE BREAKPOINTS
+   ==================================================================== */
+@media (max-width: 980px) {
+  .dreelio-landing .wrap, .dreelio-landing .wrap-wide { padding: 0 20px; }
+  .dreelio-landing .hero-split    { grid-template-columns: 1fr !important; }
+  .dreelio-landing .tabs-card     { grid-template-columns: 1fr !important; }
+  .dreelio-landing .bento-top     { grid-template-columns: 1fr !important; }
+  .dreelio-landing .resources-grid{ grid-template-columns: 1fr !important; }
+  .dreelio-landing .cta-grid      { grid-template-columns: 1fr !important; }
+  .dreelio-landing .cta-mock      { display: none !important; }
+  .dreelio-landing .deck          { height: min(64vh, 480px) !important; }
+  .dreelio-landing .bento-bottom  { grid-template-columns: 1fr 1fr !important; }
+  .dreelio-landing .footer-grid   { grid-template-columns: 1fr 1fr !important; }
+  .dreelio-landing .nav-links-desktop { display: none !important; }
+  .dreelio-landing .nav-desktop-cta    { display: none !important; }
+
+  .dreelio-landing .dreelio-nav-shell {
+    padding: 14px 16px 0 !important;
+  }
+
+  .dreelio-landing .dreelio-nav-bar {
+    max-width: none !important;
+    width: 100% !important;
+    height: 56px !important;
+    padding: 0 14px 0 18px !important;
+    border-radius: var(--r-pill) !important;
+    background: rgba(251, 248, 241, 0.88) !important;
+    backdrop-filter: blur(16px) saturate(1.4) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(1.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.65) !important;
+    box-shadow: var(--sh-lg) !important;
+  }
+
+  .dreelio-landing.dreelio-dark .dreelio-nav-bar {
+    background: rgba(28, 25, 20, 0.88) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dreelio-landing .nav-mobile-toggle {
+    display: flex !important;
+  }
+
+  .dreelio-landing .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    margin: 0;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    background: rgba(33, 29, 22, 0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: mobile-nav-fade-in 0.35s var(--ease);
+  }
+
+  .dreelio-landing .mobile-nav-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    animation: mobile-nav-stack-in 0.4s var(--ease);
+  }
+
+  .dreelio-landing .mobile-nav-card {
+    background: rgba(251, 248, 241, 0.78);
+    backdrop-filter: blur(22px) saturate(1.5);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 32px;
+    box-shadow: var(--sh-lg);
+    padding: clamp(40px, 12vw, 64px) 24px;
+    min-height: min(48vh, 380px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dreelio-landing.dreelio-dark .mobile-nav-card {
+    background: rgba(28, 25, 20, 0.82);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .dreelio-landing .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(20px, 5vw, 30px);
+    width: 100%;
+  }
+
+  .dreelio-landing .nav-link-mobile {
+    font-size: clamp(21px, 5.2vw, 27px);
+    font-weight: 500;
+    color: var(--ink);
+    border-bottom: none;
+    padding: 0;
+    letter-spacing: -0.02em;
+  }
+
+  .dreelio-landing .nav-link-mobile:hover,
+  .dreelio-landing .nav-link-mobile.is-active {
+    border-bottom: none;
+  }
+
+  .dreelio-landing .nav-link-mobile.is-active {
+    font-weight: 600;
+  }
+
+  .dreelio-landing .mobile-nav-cta {
+    width: 100%;
+    justify-content: center;
+    padding: 15px 22px;
+    font-size: 16px;
+    border-radius: var(--r-pill);
+    box-shadow: var(--sh-lg);
+  }
+
+  /* Analyze wizard — back above step kicker, clear of fixed nav */
+  .dreelio-landing .wizard-shell {
+    padding-top: 92px;
+  }
+
+  .dreelio-landing .wizard-layout {
+    padding-top: 20px;
+  }
+
+  .dreelio-landing .wizard-header {
+    margin-bottom: 28px;
+    min-height: 28px;
+  }
+
+  .dreelio-landing .wizard-header .wizard-back-btn {
+    display: none;
+  }
+
+  .dreelio-landing .wizard-header .wizard-back-spacer {
+    display: none;
+  }
+
+  .dreelio-landing .wizard-back-btn--inline {
+    display: inline-flex;
+    margin-bottom: 14px;
+  }
+
+  .dreelio-landing .tabs-card > div:last-child {
+    border-left: none !important;
+    border-top: 1px solid var(--line) !important;
+  }
+  .dreelio-landing .pipeline-scroller {
+    height: auto !important;
+    padding-bottom: clamp(48px, 8vw, 96px);
+  }
+  .dreelio-landing .pipeline-sticky {
+    position: static !important;
+    min-height: 0 !important;
+  }
+  .dreelio-landing .pipeline-hint { display: none !important; }
+
+  .dreelio-landing .pipeline-mobile-nav {
+    top: 64px;
+  }
+
+  .dreelio-landing .pipeline-mobile-step {
+    scroll-margin-top: 132px;
+  }
+}
+
+@media (max-width: 767px) {
+  .dreelio-landing #top .hero-ctas {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .dreelio-landing #top .hero-ctas .btn {
+    width: min(100%, 320px);
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .dreelio-landing .bento-bottom { grid-template-columns: 1fr !important; }
+  .dreelio-landing .footer-grid  { grid-template-columns: 1fr !important; }
+  .dreelio-landing .hero-art     { display: none; }
+}
+
+/* ====================================================================
+   HERO — full-viewport + entrance animation
+   ==================================================================== */
+
+/* Hero — leaves trust marquee visible on entry */
+.dreelio-landing .hero-viewport {
+  min-height: 75vh;
+  min-height: 75svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 88px;   /* clear fixed nav */
+  padding-bottom: 48px;
+  text-align: center;
+}
+
+/* Entrance animation */
+@keyframes heroLandIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dreelio-landing .hero-land-1 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both; }
+.dreelio-landing .hero-land-2 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both; }
+.dreelio-landing .hero-land-3 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.38s both; }
+.dreelio-landing .hero-land-4 { animation: heroLandIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.52s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dreelio-landing .hero-land-1,
+  .dreelio-landing .hero-land-2,
+  .dreelio-landing .hero-land-3,
+  .dreelio-landing .hero-land-4 { animation: none; }
+}
+
+/* ====================================================================
+   WIZARD — Analyze / Demo onboarding flow
+   ==================================================================== */
+
+@keyframes wizardEnterUp {
+  from { opacity: 0; transform: translateY(52px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes wizardEnterDown {
+  from { opacity: 0; transform: translateY(-52px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dreelio-landing .wiz-enter-fwd  { animation: wizardEnterUp   0.52s var(--ease) both; }
+.dreelio-landing .wiz-enter-back { animation: wizardEnterDown 0.52s var(--ease) both; }
+
+.dreelio-landing .wizard-shell {
+  min-height: 100vh;
+  padding-top: 80px;
+}
+
+.dreelio-landing .wizard-layout {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: clamp(44px,6vw,80px) 24px clamp(60px,8vw,100px);
+}
+
+/* Header row — back button left, dots centered, right spacer */
+.dreelio-landing .wizard-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 56px;
+  min-height: 36px;
+}
+.dreelio-landing .wizard-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: color 0.2s;
+  font-family: var(--font);
+  z-index: 1;
+}
+.dreelio-landing .wizard-back-btn:hover { color: var(--accent); }
+.dreelio-landing .wizard-back-btn--inline {
+  display: none;
+}
+.dreelio-landing .wizard-back-spacer { flex: 1; }
+
+.dreelio-landing .wizard-dots {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dreelio-landing .wizard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  opacity: 0.15;
+  transition: width 0.35s var(--ease), opacity 0.35s var(--ease), background 0.35s var(--ease);
+}
+.dreelio-landing .wizard-dot.active {
+  width: 24px;
+  opacity: 1;
+  background: var(--accent);
+}
+.dreelio-landing .wizard-dot.done {
+  opacity: 0.45;
+  background: var(--accent);
+}
+
+/* Step heading block */
+.dreelio-landing .wizard-kicker {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-tint);
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  margin-bottom: 18px;
+}
+
+/* ─ Plan-type option cards (step 0) ─────────────────────────── */
+.dreelio-landing .plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 40px;
+}
+@media (max-width: 660px) {
+  .dreelio-landing .plan-grid { grid-template-columns: 1fr; }
+}
+
+.dreelio-landing .plan-card {
+  padding: 36px 24px 32px;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: var(--card);
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.15s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+}
+.dreelio-landing .plan-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--sh-md);
+  transform: translateY(-3px);
+}
+.dreelio-landing .plan-card.is-selected {
+  border-color: var(--accent);
+  background: rgba(0,52,97,0.04);
+  box-shadow: var(--sh-md);
+}
+.dreelio-landing .plan-card-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,52,97,0.08);
+  margin-bottom: 18px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.dreelio-landing .plan-card:hover .plan-card-icon,
+.dreelio-landing .plan-card.is-selected .plan-card-icon {
+  background: var(--accent);
+}
+.dreelio-landing .plan-card-icon .ms {
+  font-size: 28px;
+  color: var(--accent);
+  transition: color 0.2s;
+}
+.dreelio-landing .plan-card:hover .plan-card-icon .ms,
+.dreelio-landing .plan-card.is-selected .plan-card-icon .ms { color: #fff; }
+.dreelio-landing .plan-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+.dreelio-landing .plan-card-desc {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+/* ─ Option cards (funding step 1) ───────────────────────────── */
+.dreelio-landing .option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 40px;
+}
+@media (max-width: 540px) {
+  .dreelio-landing .option-grid { grid-template-columns: 1fr; }
+}
+
+.dreelio-landing .option-card {
+  padding: 28px;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+}
+.dreelio-landing .option-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--sh-md);
+}
+.dreelio-landing .option-card.is-selected {
+  border-color: var(--accent);
+  background: rgba(0,52,97,0.04);
+}
+.dreelio-landing .option-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,52,97,0.08);
+  margin-bottom: 16px;
+  transition: background 0.2s;
+}
+.dreelio-landing .option-card.is-selected .option-card-icon { background: var(--accent); }
+.dreelio-landing .option-card-icon .ms { font-size: 22px; color: var(--accent); transition: color 0.2s; }
+.dreelio-landing .option-card.is-selected .option-card-icon .ms { color: #fff; }
+.dreelio-landing .option-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.dreelio-landing .option-card-desc {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+/* ─ Upload cards (step 2) ────────────────────────────────────── */
+.dreelio-landing .upload-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 32px;
+}
+@media (max-width: 700px) {
+  .dreelio-landing .upload-grid { grid-template-columns: 1fr; }
+}
+
+.dreelio-landing .upload-card {
+  border-radius: var(--r-lg);
+  border: 2px dashed rgba(0,52,97,0.25);
+  background: var(--card);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px;
+  gap: 10px;
+  min-height: 200px;
+  justify-content: center;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.15s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+  width: 100%;
+}
+.dreelio-landing .upload-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--sh-sm);
+  transform: translateY(-2px);
+}
+.dreelio-landing .upload-card.is-dragging {
+  border-style: solid;
+  border-color: var(--accent);
+  background: rgba(0,52,97,0.04);
+  transform: scale(1.02);
+}
+.dreelio-landing .upload-card.is-uploaded {
+  border-style: solid;
+  border-color: var(--emerald);
+  background: #f0fdf4;
+  cursor: default;
+}
+.dreelio-landing .upload-card.is-demo {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+.dreelio-landing .upload-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,52,97,0.08);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.dreelio-landing .upload-card:hover .upload-card-icon,
+.dreelio-landing .upload-card.is-dragging .upload-card-icon { background: var(--accent); }
+.dreelio-landing .upload-card.is-uploaded .upload-card-icon { background: #dcfce7; }
+.dreelio-landing .upload-card-icon .ms { font-size: 24px; color: var(--accent); transition: color 0.2s; }
+.dreelio-landing .upload-card:hover .upload-card-icon .ms,
+.dreelio-landing .upload-card.is-dragging .upload-card-icon .ms { color: #fff; }
+.dreelio-landing .upload-card.is-uploaded .upload-card-icon .ms { color: var(--emerald); }
+
+/* Demo case selector pill row */
+.dreelio-landing .demo-case-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.dreelio-landing .demo-case-pill {
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--line-strong);
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  font-family: var(--font);
+  appearance: none;
+}
+.dreelio-landing .demo-case-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.dreelio-landing .demo-case-pill.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Wizard bottom nav */
+.dreelio-landing .wizard-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 48px;
+  flex-wrap: wrap;
+}
+
+/* Processing view */
+.dreelio-landing .processing-shell {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: clamp(60px,8vw,100px) 24px;
+  text-align: center;
+}
+.dreelio-landing .processing-card {
+  background: var(--card);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--sh-md);
+  margin-top: 8px;
+  text-align: left;
+}
+.dreelio-landing .processing-bar-track {
+  height: 4px;
+  background: rgba(0,52,97,0.1);
+}
+.dreelio-landing .processing-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.5s var(--ease);
+}
+.dreelio-landing .processing-stages {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dreelio-landing .stage-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transition: opacity 0.3s;
+}
+.dreelio-landing .stage-row.is-pending { opacity: 0.3; }
+.dreelio-landing .stage-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,52,97,0.2);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+@keyframes wizSpin { to { transform: rotate(360deg); } }
+.dreelio-landing .wiz-spin { display: inline-block; animation: wizSpin 1s linear infinite; }

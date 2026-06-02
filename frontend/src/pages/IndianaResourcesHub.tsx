@@ -13,7 +13,7 @@ const guides = [
   {
     title: 'IDOI Complaint Form Guide',
     meta: 'PDF · IDOI',
-    href: 'https://www.in.gov/idoi/files/Provider_Complaint_form-12.20.21.pdf',
+    href: 'https://www.in.gov/idoi/files/Consumer_Complaint_Form.pdf',
   },
   {
     title: 'Medicaid Appeals Handbook',
@@ -52,9 +52,9 @@ export default function IndianaResourcesHub() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-primary uppercase tracking-wider">Deep Dive Analysis</span>
-                <button type="button" className="p-2 rounded-full bg-surface-container hover:bg-primary hover:text-on-primary transition-colors">
+                <a href="https://www.erisaexperience.com/blog/self-funded-plans-vs-insured-plans-what-is-the-difference/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-surface-container hover:bg-primary hover:text-on-primary transition-colors">
                   <span className="material-symbols-outlined">arrow_forward</span>
-                </button>
+                </a>
               </div>
             </div>
 
@@ -77,19 +77,17 @@ export default function IndianaResourcesHub() {
             </div>
 
             <div className="bg-surface-container-low p-8 rounded-xl flex flex-col md:flex-row gap-6 items-center md:col-span-3 border border-outline-variant/10">
-              <img
-                alt="Indiana Department of Insurance Building"
-                className="w-full md:w-48 h-32 object-cover rounded-lg"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcrivu7BbiBWtQRbB_o357ht7SMv2cGuxyJ9X1WW4-L_0t9GRNjJ_A1L4kXWfnV56hZsfFQ3ka0OfV-b747RbDjIjryWydoPYWSyiof6psJeNDml56UiARP_HYgHKIl9G3sJcyG7_CyIdld8BGaUcUhVAypYLiWI40ADgW310pB3FmE08rntRuFByN4BKVhY3mQEUzCjfM7WxerGFPmYsDPetll4gSDlsaOwX80DJFQ3l7Val0WTyrcg_KATdSeDmxZOGz3A4P140"
-              />
               <div>
                 <h3 className="text-lg font-bold text-primary mb-2">External Review (IDOI)</h3>
                 <p className="text-sm text-on-surface-variant leading-relaxed">
                   When an internal appeal fails, Indiana law allows for an External Review by an Independent Review Organization (IRO) through the Indiana Department of Insurance.
                 </p>
-                <div className="mt-4 flex gap-4">
+                <div className="mt-4 flex flex-wrap gap-4 items-center">
                   <span className="px-2 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-bold rounded">MANDATORY STEP</span>
                   <span className="px-2 py-1 bg-secondary-fixed text-on-secondary-fixed text-[10px] font-bold rounded">IC 27-8-29</span>
+                  <a href="https://www.in.gov/idoi/consumer-services/internal-and-external-grievance-procedures/" target="_blank" rel="noopener noreferrer" className="text-primary font-bold text-xs inline-flex items-center gap-1 hover:underline ml-auto">
+                    IDOI Grievance Guide <span className="material-symbols-outlined text-sm">open_in_new</span>
+                  </a>
                 </div>
               </div>
             </div>
