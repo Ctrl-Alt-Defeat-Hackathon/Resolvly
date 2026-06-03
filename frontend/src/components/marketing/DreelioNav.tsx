@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 import TransitionLink from './TransitionLink'
 import { hashFromNavHref, useActiveSection } from './useActiveSection'
 import { goToSection, scrollToPageTop } from '../../lib/pageScroll'
@@ -30,9 +30,11 @@ function NavLogo({
 export default function DreelioNav({
   onStart,
   activePath,
+  appMode = false,
 }: {
-  onStart: () => void
+  onStart?: () => void
   activePath?: 'home' | 'resources'
+  appMode?: boolean
 }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -172,21 +174,42 @@ export default function DreelioNav({
           {links.map((l) => renderLink(l))}
         </div>
 
-        <button
-          type="button"
-          className="btn btn-primary nav-desktop-cta"
-          style={{
-            padding: scrolled ? '9px 18px' : '11px 22px',
-            fontSize: 14,
-            opacity: scrolled ? 1 : 0,
-            transform: scrolled ? 'none' : 'translateX(12px)',
-            pointerEvents: scrolled ? 'auto' : 'none',
-            transition: 'opacity .4s var(--ease), transform .4s var(--ease)',
-          }}
-          onClick={onStart}
-        >
-          Start Free Analysis
-        </button>
+        {appMode ? (
+          <Link
+            to="/"
+            className="nav-desktop-cta"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--accent)',
+              textDecoration: 'none',
+              padding: '9px 0',
+              opacity: 1,
+              transition: 'opacity .2s',
+            }}
+          >
+            ← Back to Home
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary nav-desktop-cta"
+            style={{
+              padding: scrolled ? '9px 18px' : '11px 22px',
+              fontSize: 14,
+              opacity: scrolled ? 1 : 0,
+              transform: scrolled ? 'none' : 'translateX(12px)',
+              pointerEvents: scrolled ? 'auto' : 'none',
+              transition: 'opacity .4s var(--ease), transform .4s var(--ease)',
+            }}
+            onClick={onStart}
+          >
+            Start Free Analysis
+          </button>
+        )}
 
         <button
           type="button"
@@ -203,7 +226,7 @@ export default function DreelioNav({
       </nav>
 
       {menuOpen ? (
-        <MobileMenuStack links={links} renderLink={renderLink} onStart={onStart} onClose={closeMenu} />
+        <MobileMenuStack links={links} renderLink={renderLink} onStart={onStart} onClose={closeMenu} appMode={appMode} />
       ) : null}
     </div>
   )
@@ -214,11 +237,13 @@ function MobileMenuStack({
   renderLink,
   onStart,
   onClose,
+  appMode = false,
 }: {
   links: NavLink[]
   renderLink: (l: NavLink, mobile?: boolean) => ReactNode
-  onStart: () => void
+  onStart?: () => void
   onClose: () => void
+  appMode?: boolean
 }) {
   return (
     <div className="mobile-nav-stack" style={{ pointerEvents: 'auto' }}>
@@ -227,17 +252,38 @@ function MobileMenuStack({
           {links.map((l) => renderLink(l, true))}
         </nav>
       </div>
-      <button
-        type="button"
-        className="btn btn-primary mobile-nav-cta"
-        onClick={() => {
-          onClose()
-          onStart()
-        }}
-      >
-        Start Free Analysis
-        <span className="ms arrow" style={{ fontSize: 19 }}>arrow_forward</span>
-      </button>
+      {appMode ? (
+        <Link
+          to="/"
+          className="btn mobile-nav-cta"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            background: 'transparent',
+            border: '2px solid var(--accent)',
+            color: 'var(--accent)',
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}
+          onClick={onClose}
+        >
+          ← Back to Home
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-primary mobile-nav-cta"
+          onClick={() => {
+            onClose()
+            onStart?.()
+          }}
+        >
+          Start Free Analysis
+          <span className="ms arrow" style={{ fontSize: 19 }}>arrow_forward</span>
+        </button>
+      )}
     </div>
   )
 }

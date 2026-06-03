@@ -101,15 +101,15 @@ function ResultCard({ result, onDraftAppeal }: { result: CodeLookupResult; onDra
 
   if (!result.found) {
     return (
-      <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid var(--line)' }}>
         <div className="p-8 flex items-start gap-4">
-          <span className="material-symbols-outlined text-error text-3xl shrink-0">search_off</span>
+          <span className="material-symbols-outlined text-3xl shrink-0" style={{ color: '#dc2626' }}>search_off</span>
           <div>
-            <p className="font-bold text-on-surface">No match: <code className="font-mono">{result.code}</code></p>
+            <p className="font-bold" style={{ color: 'var(--ink)' }}>No match: <code className="font-mono">{result.code}</code></p>
             {result.description ? (
-              <p className="text-sm text-on-surface-variant mt-2 leading-relaxed">{result.description}</p>
+              <p className="text-sm mt-2 leading-relaxed" style={{ color: 'var(--ink-2)' }}>{result.description}</p>
             ) : (
-              <p className="text-sm text-on-surface-variant mt-1">
+              <p className="text-sm mt-1" style={{ color: 'var(--ink-2)' }}>
                 This code could not be resolved. Try checking the spelling or selecting the code type manually.
               </p>
             )}
@@ -121,50 +121,50 @@ function ResultCard({ result, onDraftAppeal }: { result: CodeLookupResult; onDra
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row">
+      <div className="lg:col-span-2 rounded-2xl overflow-hidden flex flex-col md:flex-row" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
         <div className="p-8 flex-1">
           <div className="flex items-center gap-3 mb-6 flex-wrap">
             <div className={`px-4 py-1.5 rounded-full font-headline font-bold text-lg border ${colorClass}`}>
               {result.code}
             </div>
-            <span className="text-on-surface-variant text-sm font-semibold uppercase tracking-widest">
+            <span className="text-sm font-semibold uppercase tracking-widest" style={{ color: 'var(--ink-3)' }}>
               {CODE_TYPE_LABELS[ct] ?? result.code_type} Code
             </span>
           </div>
           <div className="space-y-6">
             <div>
-              <h4 className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Official Description</h4>
-              <p className="text-on-surface font-semibold text-base leading-snug">{result.description}</p>
+              <h4 className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--accent)' }}>Official Description</h4>
+              <p className="font-semibold text-base leading-snug" style={{ color: 'var(--ink)' }}>{result.description}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {result.plain_english && (
-                <div className="bg-surface-container-low p-4 rounded-lg">
-                  <h4 className="text-xs font-bold text-secondary uppercase tracking-widest mb-2 flex items-center gap-2">
+                <div className="p-4 rounded-xl" style={{ background: 'var(--canvas)' }}>
+                  <h4 className="text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: 'var(--accent)' }}>
                     <span className="material-symbols-outlined text-sm">record_voice_over</span> Plain English
                   </h4>
-                  <p className="text-sm text-on-surface-variant leading-relaxed">{result.plain_english}</p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>{result.plain_english}</p>
                 </div>
               )}
               {result.common_fix && (
-                <div className="bg-surface-container-low p-4 rounded-lg">
-                  <h4 className="text-xs font-bold text-secondary uppercase tracking-widest mb-2 flex items-center gap-2">
+                <div className="p-4 rounded-xl" style={{ background: 'var(--canvas)' }}>
+                  <h4 className="text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: 'var(--accent)' }}>
                     <span className="material-symbols-outlined text-sm">build</span> Common Fix
                   </h4>
-                  <p className="text-sm text-on-surface-variant leading-relaxed">{result.common_fix}</p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>{result.common_fix}</p>
                 </div>
               )}
               {/* NPI provider details */}
               {ct === 'npi' && result.extra && Object.keys(result.extra).length > 0 && (
-                <div className="bg-surface-container-low p-4 rounded-lg md:col-span-2">
-                  <h4 className="text-xs font-bold text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
+                <div className="p-4 rounded-xl md:col-span-2" style={{ background: 'var(--canvas)' }}>
+                  <h4 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--accent)' }}>
                     <span className="material-symbols-outlined text-sm">badge</span> Provider Details
                   </h4>
                   <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                    {result.extra.provider_name && <><dt className="text-on-surface-variant">Name</dt><dd className="font-semibold text-on-surface">{result.extra.provider_name}</dd></>}
-                    {result.extra.specialty && <><dt className="text-on-surface-variant">Specialty</dt><dd className="font-semibold text-on-surface">{result.extra.specialty}</dd></>}
-                    {result.extra.provider_type && <><dt className="text-on-surface-variant">Type</dt><dd className="font-semibold text-on-surface">{result.extra.provider_type}</dd></>}
-                    {result.extra.city && result.extra.state && <><dt className="text-on-surface-variant">Location</dt><dd className="font-semibold text-on-surface">{result.extra.city}, {result.extra.state} {result.extra.zip_code}</dd></>}
-                    {result.extra.phone && <><dt className="text-on-surface-variant">Phone</dt><dd className="font-semibold text-on-surface">{result.extra.phone}</dd></>}
+                    {result.extra.provider_name && <><dt style={{ color: 'var(--ink-3)' }}>Name</dt><dd className="font-semibold" style={{ color: 'var(--ink)' }}>{result.extra.provider_name}</dd></>}
+                    {result.extra.specialty && <><dt style={{ color: 'var(--ink-3)' }}>Specialty</dt><dd className="font-semibold" style={{ color: 'var(--ink)' }}>{result.extra.specialty}</dd></>}
+                    {result.extra.provider_type && <><dt style={{ color: 'var(--ink-3)' }}>Type</dt><dd className="font-semibold" style={{ color: 'var(--ink)' }}>{result.extra.provider_type}</dd></>}
+                    {result.extra.city && result.extra.state && <><dt style={{ color: 'var(--ink-3)' }}>Location</dt><dd className="font-semibold" style={{ color: 'var(--ink)' }}>{result.extra.city}, {result.extra.state} {result.extra.zip_code}</dd></>}
+                    {result.extra.phone && <><dt style={{ color: 'var(--ink-3)' }}>Phone</dt><dd className="font-semibold" style={{ color: 'var(--ink)' }}>{result.extra.phone}</dd></>}
                   </dl>
                 </div>
               )}
@@ -174,7 +174,7 @@ function ResultCard({ result, onDraftAppeal }: { result: CodeLookupResult; onDra
                 href={result.source_url || '#'}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-blue-600 font-semibold hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-semibold hover:underline" style={{ color: 'var(--accent)' }}
               >
                 <span className="material-symbols-outlined text-sm">open_in_new</span>
                 Source: {result.source}
@@ -183,12 +183,12 @@ function ResultCard({ result, onDraftAppeal }: { result: CodeLookupResult; onDra
           </div>
         </div>
         {(result.common_fix || ct === 'carc' || ct === 'rarc') && (
-          <div className="bg-primary p-8 md:w-64 flex flex-col justify-between shrink-0">
+          <div className="p-8 md:w-64 flex flex-col justify-between shrink-0" style={{ background: 'var(--accent)', color: '#fff' }}>
             <div>
-              <h4 className="text-xs font-bold text-primary-fixed uppercase tracking-widest mb-4 flex items-center gap-2">
+              <h4 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2" style={{ opacity: 0.8 }}>
                 <span className="material-symbols-outlined text-sm">tips_and_updates</span> Next Step
               </h4>
-              <p className="text-on-primary text-sm leading-relaxed mb-6 font-medium">
+              <p className="text-sm leading-relaxed mb-6 font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
                 {result.common_fix
                   ? result.common_fix
                   : 'Use this code information to strengthen your appeal letter with precise regulatory language.'}
@@ -197,7 +197,8 @@ function ResultCard({ result, onDraftAppeal }: { result: CodeLookupResult; onDra
             <button
               type="button"
               onClick={onDraftAppeal}
-              className="w-full bg-white text-primary py-3 rounded-xl font-headline font-bold text-sm shadow-xl hover:scale-105 transition-transform"
+              className="w-full py-3 rounded-full font-bold text-sm hover:opacity-90 transition-all"
+              style={{ background: '#fff', color: 'var(--accent)' }}
             >
               DRAFT APPEAL
             </button>
@@ -205,28 +206,29 @@ function ResultCard({ result, onDraftAppeal }: { result: CodeLookupResult; onDra
         )}
       </div>
 
-      <div className="bg-surface-container p-8 rounded-xl flex flex-col justify-between border-t-4 border-primary">
+      <div className="p-8 rounded-2xl flex flex-col justify-between" style={{ background: 'var(--canvas)', border: '1px solid var(--line)', borderTop: '4px solid var(--accent)' }}>
         <div>
-          <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-6 shadow-sm">
-            <span className="material-symbols-outlined text-primary text-2xl">info</span>
+          <div className="w-12 h-12 rounded-lg flex items-center justify-center mb-6" style={{ background: '#fff', boxShadow: 'var(--sh-sm)' }}>
+            <span className="material-symbols-outlined text-2xl" style={{ color: 'var(--accent)' }}>info</span>
           </div>
-          <h3 className="font-extrabold text-xl text-primary mb-2 leading-tight">About This Code</h3>
-          <p className="text-on-surface-variant text-sm mb-4 leading-relaxed">
+          <h3 className="font-extrabold text-xl mb-2 leading-tight" style={{ color: 'var(--accent)' }}>About This Code</h3>
+          <p className="text-sm mb-4 leading-relaxed" style={{ color: 'var(--ink-2)' }}>
             <strong>Type:</strong> {CODE_TYPE_LABELS[ct] ?? result.code_type}<br />
             <strong>Code:</strong> <code className="font-mono">{result.code}</code>
           </p>
           {result.source && (
-            <p className="text-xs text-on-surface-variant leading-relaxed">
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-3)' }}>
               Data sourced from <strong>{result.source}</strong> — an authoritative regulatory database updated annually.
             </p>
           )}
         </div>
         <Link
           to="/indiana-resources"
-          className="mt-6 flex items-center justify-between group p-4 bg-white rounded-xl border border-outline-variant/20 hover:border-primary transition-all"
+          className="mt-6 flex items-center justify-between group p-4 rounded-xl transition-all hover:opacity-80"
+          style={{ background: '#fff', border: '1px solid var(--line)' }}
         >
-          <span className="font-headline font-bold text-sm text-primary">Indiana Resources</span>
-          <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+          <span className="font-bold text-sm" style={{ color: 'var(--accent)' }}>Indiana Resources</span>
+          <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>arrow_forward</span>
         </Link>
       </div>
     </div>
@@ -289,41 +291,43 @@ export default function CodeLookupContent() {
   const activeType = selectedType ?? detectedType
 
   return (
-    <div className="w-full bg-surface pb-8">
-      <nav className="mb-8 flex items-center gap-2 text-on-surface-variant font-medium text-[10px] uppercase tracking-widest">
-        <Link to="/indiana-resources" className="hover:text-primary transition-colors">
+    <div className="w-full pb-8">
+      <nav className="mb-8 flex items-center gap-2 font-medium text-[10px] uppercase tracking-widest" style={{ color: 'var(--ink-3)' }}>
+        <Link to="/indiana-resources" className="hover:underline transition-colors" style={{ color: 'var(--ink-3)' }}>
           Indiana Resources
         </Link>
         <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-        <span className="text-primary font-bold">Code &amp; Term Lookup</span>
+        <span className="font-bold" style={{ color: 'var(--accent)' }}>Code &amp; Term Lookup</span>
       </nav>
 
       {/* Header + Search */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-10">
         <div className="lg:col-span-7">
-          <h1 className="text-4xl md:text-5xl font-extrabold font-headline text-primary tracking-tight mb-4">
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4" style={{ color: 'var(--accent)', letterSpacing: '-0.03em' }}>
             Code &amp; Term Lookup
           </h1>
-          <p className="text-lg text-on-surface-variant leading-relaxed max-w-2xl">
+          <p className="text-lg leading-relaxed max-w-2xl" style={{ color: 'var(--ink-2)' }}>
             Look up any ICD-10, CPT, HCPCS, CARC, RARC, or NPI code. Results are fetched live from authoritative CMS and regulatory sources.
           </p>
         </div>
         <div className="lg:col-span-5 flex items-end">
-          <div className="w-full bg-surface-container-lowest p-1 rounded-full shadow-lg border border-outline-variant/10 flex items-center">
-            <span className="material-symbols-outlined ml-4 text-outline">search</span>
+          <div className="w-full p-1 rounded-full flex items-center" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
+            <span className="material-symbols-outlined ml-4" style={{ color: 'var(--ink-3)' }}>search</span>
             <input
               value={query}
               onChange={e => { setQuery(e.target.value); setResult(null); setError(null) }}
               onKeyDown={handleKeyDown}
               className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-4 py-3 h-14"
               placeholder="e.g. M54.5 · CPT 99213 · CARC CO-50 · NPI 1234567890"
+              style={{ color: 'var(--ink)', fontFamily: 'var(--font)' }}
               type="text"
             />
             <button
               type="button"
               onClick={handleLookup}
               disabled={isLoading || !query.trim()}
-              className="bg-primary text-on-primary px-6 md:px-8 py-3 rounded-full font-headline font-bold text-sm tracking-wide mr-1 shadow-md hover:brightness-110 transition-all disabled:opacity-50"
+              className="px-6 md:px-8 py-3 rounded-full font-bold text-sm tracking-wide mr-1 hover:opacity-90 transition-all disabled:opacity-50"
+              style={{ background: 'var(--accent)', color: '#fff' }}
             >
               {isLoading ? 'LOOKING…' : 'IDENTIFY'}
             </button>
@@ -361,10 +365,8 @@ export default function CodeLookupContent() {
               key={title}
               type="button"
               onClick={() => handleCategoryClick(type)}
-              className={`group relative overflow-hidden p-6 rounded-xl text-left transition-all duration-300
-                ${active
-                  ? 'bg-primary text-on-primary shadow-lg scale-[1.02]'
-                  : 'bg-surface-container-low hover:bg-primary hover:text-on-primary'}`}
+              className="group relative overflow-hidden p-6 rounded-2xl text-left transition-all duration-300"
+              style={active ? { background: 'var(--accent)', color: '#fff', boxShadow: 'var(--sh-md)', transform: 'scale(1.02)' } : { background: '#fff', border: '1px solid var(--line)' }}
             >
               {active && (
                 <div className="absolute top-3 right-3 bg-white/20 text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">
@@ -372,17 +374,14 @@ export default function CodeLookupContent() {
                 </div>
               )}
               <div className="flex flex-col gap-4">
-                <span className={`material-symbols-outlined text-3xl transition-colors
-                  ${active ? 'text-on-primary' : 'text-primary group-hover:text-on-primary'}`}>
+                <span className="material-symbols-outlined text-3xl transition-colors" style={{ color: active ? '#fff' : 'var(--accent)' }}>
                   {icon}
                 </span>
                 <div>
-                  <h3 className={`font-headline font-bold text-lg transition-colors
-                    ${active ? 'text-on-primary' : 'text-primary group-hover:text-on-primary'}`}>
+                  <h3 className="font-bold text-lg transition-colors" style={{ color: active ? '#fff' : 'var(--accent)' }}>
                     {title}
                   </h3>
-                  <p className={`text-xs font-medium transition-colors
-                    ${active ? 'text-on-primary/70' : 'text-on-secondary-container group-hover:text-on-primary/70'}`}>
+                  <p className="text-xs font-medium transition-colors" style={{ color: active ? 'rgba(255,255,255,0.7)' : 'var(--ink-3)' }}>
                     {subtitle}
                   </p>
                 </div>
@@ -417,9 +416,9 @@ export default function CodeLookupContent() {
 
       {/* Placeholder when no result yet */}
       {!result && !isLoading && !error && (
-        <div className="mb-12 bg-surface-container-lowest rounded-xl p-8 border border-outline-variant/10 flex items-center gap-6">
-          <div className="bg-secondary-container w-14 h-14 rounded-full flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-primary text-2xl">manage_search</span>
+        <div className="mb-12 p-8 rounded-2xl flex items-center gap-6" style={{ background: '#fff', border: '1px solid var(--line)' }}>
+          <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--accent-soft)' }}>
+            <span className="material-symbols-outlined text-2xl" style={{ color: 'var(--accent)' }}>manage_search</span>
           </div>
           <div>
             <p className="font-bold text-on-surface mb-1">Enter a code to get started</p>
@@ -438,13 +437,13 @@ export default function CodeLookupContent() {
       <section className="mt-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-headline font-bold text-primary tracking-tight">Terminology Glossary</h2>
-            <p className="text-sm text-on-surface-variant">Essential medical-legal vocabulary for successful appeals.</p>
+            <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--accent)', letterSpacing: '-0.02em' }}>Terminology Glossary</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--ink-3)' }}>Essential medical-legal vocabulary for successful appeals.</p>
           </div>
         </div>
         <div className="flex gap-6 overflow-x-auto no-scrollbar pb-8">
           {glossaryTerms.map(({ category, term, def }) => (
-            <div key={term} className="min-w-[320px] bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant/10">
+            <div key={term} className="min-w-[320px] p-6 rounded-2xl" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
               <span className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2 block">{category}</span>
               <h4 className="font-headline font-extrabold text-xl text-on-surface mb-3">{term}</h4>
               <p className="text-sm text-on-surface-variant leading-relaxed">{def}</p>

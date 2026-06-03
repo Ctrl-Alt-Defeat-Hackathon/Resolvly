@@ -1,14 +1,12 @@
 import { Outlet } from 'react-router-dom'
-import Navbar from '../components/Navbar'
-import Footer from '../components/Footer'
+import '../styles/dreelio-landing.css'
+import AppNav from '../components/AppNav'
+import DreelioFooter from '../components/marketing/DreelioFooter'
 
 export default function IndianaResourcesLayout() {
   return (
-    <div
-      className="bg-background text-on-background selection:bg-secondary-container min-h-screen flex flex-col"
-      style={{ fontFamily: "'Inter', sans-serif" }}
-    >
-      <Navbar />
+    <div className="dreelio-landing min-h-screen flex flex-col" style={{ background: 'var(--canvas)', color: 'var(--ink)', fontFamily: 'var(--font)' }}>
+      <AppNav />
 
       <main className="flex-1 pt-24 pb-24 md:pb-12">
         <div className="editorial-margin">
@@ -16,7 +14,7 @@ export default function IndianaResourcesLayout() {
         </div>
       </main>
 
-      <Footer />
+      <DreelioFooter />
     </div>
   )
 }
