@@ -496,7 +496,14 @@ export default function ActionPlan() {
                       <div className={`p-6 rounded-xl ${!active ? 'opacity-75' : ''}`} style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }}>
                         <div className="flex justify-between items-start mb-2">
                           <h4 className="font-bold text-lg">{title}</h4>
-                          {tag && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>{tag}</span>}
+                          {tag && (
+                            <span
+                              className={['px-2 py-0.5 rounded-full text-[10px] font-bold uppercase', tagClass].filter(Boolean).join(' ')}
+                              style={tagClass ? undefined : { background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                            >
+                              {tag}
+                            </span>
+                          )}
                         </div>
                         <p className="text-on-surface-variant text-sm mb-4">{desc}</p>
                         {why && (
