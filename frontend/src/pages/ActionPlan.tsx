@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Navbar from '../components/Navbar'
-import Footer from '../components/Footer'
+import '../styles/dreelio-landing.css'
+import AppNav from '../components/AppNav'
+import DreelioFooter from '../components/marketing/DreelioFooter'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { analysisBundleFingerprint, loadAnalysisBundle } from '../lib/sessionKeys'
 import { postExportIcs } from '../lib/api'
@@ -380,33 +381,33 @@ export default function ActionPlan() {
   }
 
   return (
-    <div className="bg-background text-on-background selection:bg-secondary-container antialiased min-h-screen flex flex-col">
-      <Navbar />
+    <div className="dreelio-landing min-h-screen flex flex-col" style={{ background: 'var(--canvas)', color: 'var(--ink)', fontFamily: 'var(--font)' }}>
+      <AppNav />
 
       <main className="pt-24 pb-24 md:pb-12 flex-grow">
         <div className="editorial-margin">
         {/* Header */}
         <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-[10px] uppercase tracking-widest font-bold">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
               <span className="material-symbols-outlined text-sm">priority_high</span>
               {severityLabel(analysis.severity_triage as string | undefined)}
-            </div>
-            <h1 className="text-5xl font-extrabold font-headline tracking-tighter text-primary">Action Plan &amp; Deadlines</h1>
+            </span>
+            <h1 className="text-5xl font-extrabold" style={{ color: 'var(--accent)', letterSpacing: '-0.03em' }}>Action Plan &amp; Deadlines</h1>
           </div>
-          <div className="glass-card p-6 rounded-xl border border-outline-variant/15 flex items-center gap-6">
+          <div className="p-6 rounded-2xl flex items-center gap-6" style={{ background: '#fff', border: '1px solid var(--line)' }}>
             <div className="relative w-20 h-20">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <path className="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="100, 100" strokeWidth="3" />
-                <path className="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray={`${prob}, 100`} strokeLinecap="round" strokeWidth="3" />
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e2d9cd" strokeDasharray="100, 100" strokeWidth="3" />
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--accent)" strokeDasharray={`${prob}, 100`} strokeLinecap="round" strokeWidth="3" />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center font-headline font-bold text-primary">
+              <div className="absolute inset-0 flex items-center justify-center font-bold text-sm" style={{ color: 'var(--accent)' }}>
                 {prob != null ? `${prob}%` : '—'}
               </div>
             </div>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant">Likelihood of Success</div>
-              <div className="text-xl font-bold text-primary">
+              <div className="text-[10px] font-bold uppercase tracking-tighter" style={{ color: 'var(--ink-3)' }}>Likelihood of Success</div>
+              <div className="text-xl font-bold" style={{ color: 'var(--accent)' }}>
                 {typeof rootCause.category === 'string'
                   ? rootCause.category.replace(/_/g, ' ')
                   : 'Analysis-based estimate'}
@@ -420,11 +421,11 @@ export default function ActionPlan() {
           <div className="lg:col-span-8 space-y-8">
             {/* Denial summary — same grid width as bill + regulatory row (one spanned cell) */}
             <section className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-labelledby="denial-summary-heading">
-              <div className="md:col-span-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm overflow-hidden flex flex-col md:min-h-[28rem]">
+              <div className="md:col-span-2 rounded-2xl overflow-hidden flex flex-col md:min-h-[28rem]" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
                 <div className="flex flex-col md:flex-row md:items-stretch flex-1 min-h-0">
-                  <div className="flex-1 p-8 md:border-r border-outline-variant/15 flex flex-col min-w-0">
+                  <div className="flex-1 p-8 md:border-r flex flex-col min-w-0" style={{ borderColor: 'var(--line)' }}>
                     <div className="flex items-center justify-between gap-4 mb-4">
-                      <h2 id="denial-summary-heading" className="font-headline font-bold text-xl text-primary">
+                      <h2 id="denial-summary-heading" className="font-bold text-xl" style={{ color: 'var(--accent)' }}>
                         Denial summary
                       </h2>
                       {summaryState.reading_level ? (
@@ -450,8 +451,8 @@ export default function ActionPlan() {
                       <p className="text-sm text-on-surface-variant flex-1">No summary text returned.</p>
                     )}
                   </div>
-                  <div className="w-full md:w-[min(100%,22rem)] lg:w-80 shrink-0 p-8 bg-surface-container/40 dark:bg-surface-container-high/30 flex flex-col border-t md:border-t-0 border-outline-variant/15">
-                    <h3 className="font-headline font-bold text-sm uppercase tracking-widest text-on-surface-variant mb-4">
+                  <div className="w-full md:w-[min(100%,22rem)] lg:w-80 shrink-0 p-8 flex flex-col border-t md:border-t-0" style={{ background: 'var(--canvas)', borderColor: 'var(--line)' }}>
+                    <h3 className="font-bold text-sm uppercase tracking-widest mb-4" style={{ color: 'var(--ink-3)', letterSpacing: '0.08em' }}>
                       Key points
                     </h3>
                     {summaryState.loading && (
@@ -479,8 +480,8 @@ export default function ActionPlan() {
             </section>
 
             {/* Recovery Roadmap — before bill breakdown & regulatory routing */}
-            <section className="bg-surface-container-low p-8 rounded-xl border border-outline-variant/15 shadow-sm">
-              <h3 className="font-headline font-bold text-2xl text-primary mb-6">Recovery Roadmap</h3>
+            <section className="p-8 rounded-2xl" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
+              <h3 className="font-bold text-2xl mb-6" style={{ color: 'var(--accent)', letterSpacing: '-0.02em' }}>Recovery Roadmap</h3>
               <div className="relative">
                 <div className="absolute top-8 left-4 bottom-8 w-0.5 bg-outline-variant/30"></div>
                 <div className="space-y-10">
@@ -489,21 +490,28 @@ export default function ActionPlan() {
                   )}
                   {steps.map(({ num, title, tag, tagClass, desc, why, active }) => (
                     <div key={num} className="relative pl-12">
-                      <div className={`absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center font-bold z-10 shadow-lg ${active ? 'signature-cta text-on-primary' : 'bg-surface-container-highest border-2 border-outline-variant text-on-surface-variant'}`}>
+                      <div className="absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center font-bold z-10" style={active ? { background: 'var(--accent)', color: '#fff', boxShadow: '0 2px 8px rgba(0,52,97,0.25)' } : { background: 'var(--canvas)', border: '2px solid var(--line)', color: 'var(--ink-3)' }}>
                         {num}
                       </div>
-                      <div className={`bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-sm ${!active ? 'opacity-80' : ''}`}>
+                      <div className={`p-6 rounded-xl ${!active ? 'opacity-75' : ''}`} style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }}>
                         <div className="flex justify-between items-start mb-2">
                           <h4 className="font-bold text-lg">{title}</h4>
-                          {tag && <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${tagClass}`}>{tag}</span>}
+                          {tag && (
+                            <span
+                              className={['px-2 py-0.5 rounded-full text-[10px] font-bold uppercase', tagClass].filter(Boolean).join(' ')}
+                              style={tagClass ? undefined : { background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                            >
+                              {tag}
+                            </span>
+                          )}
                         </div>
                         <p className="text-on-surface-variant text-sm mb-4">{desc}</p>
                         {why && (
                           <details className="text-sm" open={openStep === num} onToggle={() => setOpenStep(openStep === num ? null : num)}>
-                            <summary className="cursor-pointer text-primary font-semibold flex items-center gap-1 hover:underline">
+                            <summary className="cursor-pointer font-semibold flex items-center gap-1 hover:underline" style={{ color: 'var(--accent)' }}>
                               Why is this required?
                             </summary>
-                            <div className="mt-3 p-4 bg-surface-container rounded-lg text-on-surface-variant italic">{why}</div>
+                            <div className="mt-3 p-4 rounded-lg italic" style={{ background: 'var(--canvas-soft)', color: 'var(--ink-2)' }}>{why}</div>
                           </details>
                         )}
                       </div>
@@ -514,12 +522,12 @@ export default function ActionPlan() {
             </section>
 
             {/* Denial letter completeness — POST /outputs/completeness */}
-            <section className="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/15 shadow-sm">
+            <section className="p-8 rounded-2xl" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
               <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
                 <div>
-                  <h3 className="font-headline font-bold text-xl text-primary">Denial Notice Completeness</h3>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mt-1">
-                    POST /outputs/completeness
+                  <h3 className="font-bold text-xl" style={{ color: 'var(--accent)' }}>Denial Notice Completeness</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: 'var(--ink-3)' }}>
+                    ACA §2719 / ERISA §503
                   </p>
                 </div>
                 {completenessState.data ? (
@@ -550,7 +558,7 @@ export default function ActionPlan() {
                   <div className="rounded-lg border border-outline-variant/15 overflow-hidden flex flex-col max-h-[min(28rem,55vh)]">
                     <div className="overflow-x-auto overflow-y-auto overscroll-contain min-h-0 flex-1">
                       <table className="w-full text-sm min-w-[20rem]">
-                        <thead className="sticky top-0 z-[1] bg-surface-container-high text-left text-[10px] uppercase tracking-widest text-on-surface-variant shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
+                        <thead className="sticky top-0 z-[1] text-left text-[10px] uppercase tracking-widest shadow-[0_1px_0_0_rgba(0,0,0,0.06)]" style={{ background: 'var(--canvas)', color: 'var(--ink-3)' }}>
                           <tr>
                             <th className="p-3 font-bold">Required element</th>
                             <th className="p-3 font-bold w-24">Status</th>
@@ -595,8 +603,8 @@ export default function ActionPlan() {
           {/* Right: Deadlines & Actions — stretches to match main column height */}
           <aside className="lg:col-span-4 flex flex-col gap-8 lg:h-full lg:min-h-0">
             {/* Deadlines */}
-            <div className="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/15 shadow-sm shrink-0">
-              <h3 className="font-headline font-bold text-xl mb-6">Critical Deadlines</h3>
+            <div className="p-8 rounded-2xl shrink-0" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
+              <h3 className="font-bold text-xl mb-6" style={{ color: 'var(--accent)', letterSpacing: '-0.02em' }}>Critical Deadlines</h3>
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0 w-12 h-14 bg-error-container rounded-lg flex flex-col items-center justify-center">
@@ -642,12 +650,12 @@ export default function ActionPlan() {
             </div>
 
             {/* Provider brief — sidebar, below deadlines */}
-            <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/15 shadow-sm shrink-0">
+            <div className="p-6 rounded-2xl shrink-0" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
               <div className="flex items-start gap-2 mb-3">
-                <span className="material-symbols-outlined text-primary text-xl shrink-0">stethoscope</span>
+                <span className="material-symbols-outlined text-xl shrink-0" style={{ color: 'var(--accent)' }}>stethoscope</span>
                 <div>
-                  <h3 className="font-headline font-bold text-lg text-primary leading-tight">Provider brief</h3>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mt-1">
+                  <h3 className="font-bold text-lg leading-tight" style={{ color: 'var(--accent)' }}>Provider brief</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: 'var(--ink-3)' }}>
                     For your treating physician
                   </p>
                 </div>
@@ -675,10 +683,10 @@ export default function ActionPlan() {
             {/* Bill + Regulatory: grow to fill remaining column height */}
             <div className="flex flex-col gap-8 flex-1 min-h-0">
             {/* Bill Breakdown — sidebar */}
-            <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/15 shadow-sm shrink-0">
+            <div className="p-6 rounded-2xl shrink-0" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-headline font-bold text-base">Bill Breakdown</h3>
-                <span className="material-symbols-outlined text-outline text-lg">account_balance_wallet</span>
+                <h3 className="font-bold text-base" style={{ color: 'var(--accent)' }}>Bill Breakdown</h3>
+                <span className="material-symbols-outlined text-lg" style={{ color: 'var(--ink-3)' }}>account_balance_wallet</span>
               </div>
               <div className="space-y-3">
                 {[
@@ -699,7 +707,8 @@ export default function ActionPlan() {
               <button
                 type="button"
                 onClick={() => navigate('/bill-breakdown')}
-                className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 border border-primary text-primary text-[11px] font-bold rounded-lg hover:bg-primary hover:text-white transition-all"
+                className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 text-[11px] font-bold rounded-full transition-all hover:opacity-80"
+                style={{ border: '1.5px solid var(--accent)', color: 'var(--accent)' }}
               >
                 <span className="material-symbols-outlined text-sm">receipt_long</span>
                 View Full Bill Breakdown
@@ -707,9 +716,9 @@ export default function ActionPlan() {
             </div>
 
             {/* Regulatory Routing — grows with column; routes stacked tightly, scroll if needed */}
-            <div className="relative overflow-hidden rounded-xl border border-outline-variant/15 bg-secondary-container p-6 dark:border-slate-600/40 dark:bg-slate-800/90 flex flex-col flex-1 min-h-0">
+            <div className="relative overflow-hidden rounded-2xl p-6 flex flex-col flex-1 min-h-0" style={{ background: 'var(--accent)', color: '#fff' }}>
               <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-                <h3 className="mb-3 font-headline text-base font-bold text-on-secondary-fixed-variant dark:text-slate-200 shrink-0">
+                <h3 className="mb-3 text-base font-bold shrink-0" style={{ color: '#fff', opacity: 0.9 }}>
                   Regulatory Routing
                 </h3>
                 {routingState.loading && (
@@ -765,7 +774,7 @@ export default function ActionPlan() {
         </div>
       </main>
 
-      <Footer disclaimer="Resolvly is not a law firm. Information provided does not constitute legal advice. Action plans are based on algorithmic analysis of insurance denial patterns and Indiana Department of Insurance (IDOI) public records." />
+      <DreelioFooter />
     </div>
   )
 }

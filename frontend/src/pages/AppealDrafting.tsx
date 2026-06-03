@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import Navbar from '../components/Navbar'
-import Footer from '../components/Footer'
+import '../styles/dreelio-landing.css'
+import AppNav from '../components/AppNav'
+import DreelioFooter from '../components/marketing/DreelioFooter'
 import { analysisBundleFingerprint, loadAnalysisBundle } from '../lib/sessionKeys'
 import { postExportPdf } from '../lib/api'
 import { getCachedAppealLetter, getCachedAssumptions } from '../lib/outputsCache'
@@ -162,26 +163,26 @@ export default function AppealDrafting() {
   }
 
   return (
-    <div className="bg-background text-on-background selection:bg-secondary-container min-h-screen flex flex-col">
-      <Navbar />
+    <div className="dreelio-landing min-h-screen flex flex-col" style={{ background: 'var(--canvas)', color: 'var(--ink)', fontFamily: 'var(--font)' }}>
+      <AppNav />
 
       <main className="pt-24 pb-24 md:pb-12">
         {/* Warning Banner */}
         <div className="mx-8 mb-8">
-          <div className="bg-tertiary-fixed text-on-tertiary-fixed p-4 rounded-xl flex items-center gap-3 shadow-sm">
-            <span className="material-symbols-outlined text-on-tertiary-fixed-variant">warning</span>
+          <div className="p-4 rounded-xl flex items-center gap-3" style={{ background: '#fff8e6', border: '1px solid #e8c84a', color: '#7a5c00' }}>
+            <span className="material-symbols-outlined">warning</span>
             <span className="font-medium">
-              Draft only—edit and verify. This content is AI-generated based on provided documents and Indiana regulations. Professional review is required.
+              Draft only — edit and verify before sending. AI-generated from your documents; not legal advice.
             </span>
           </div>
         </div>
 
         <div className="editorial-margin">
           <header className="mb-12">
-            <h1 className="text-4xl md:text-5xl font-extrabold font-headline text-primary tracking-tight mb-2">
+            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-2" style={{ color: 'var(--accent)', letterSpacing: '-0.03em' }}>
               Appeal Drafting Room
             </h1>
-            <p className="max-w-2xl leading-relaxed text-on-surface-variant">
+            <p className="max-w-2xl leading-relaxed" style={{ color: 'var(--ink-2)' }}>
               Drafts are produced by the output agent from your analyzed claim. Edit before sending; this is not legal advice.
             </p>
           </header>
@@ -190,12 +191,13 @@ export default function AppealDrafting() {
             {/* Main Editor */}
             <div className="lg:col-span-8 space-y-6">
               {/* Tabs */}
-              <div className="bg-surface-container-low rounded-xl p-1 flex gap-1">
+              <div className="rounded-xl p-1 flex gap-1" style={{ background: 'var(--canvas)' }}>
                 {tabs.map((tab, i) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(i)}
-                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all ${activeTab === i ? 'bg-surface-container-lowest text-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-high'}`}
+                    className="flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all"
+                    style={activeTab === i ? { background: '#fff', color: 'var(--accent)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' } : { color: 'var(--ink-3)' }}
                   >
                     {tab}
                   </button>
@@ -203,24 +205,25 @@ export default function AppealDrafting() {
               </div>
 
               {/* Editor Canvas */}
-              <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/10 overflow-hidden">
+              <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid var(--line)', boxShadow: 'var(--sh-sm)' }}>
                 {/* Toolbar */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-surface-container">
+                <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--line)' }}>
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">v1.2 Draft</span>
+                    <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--ink-3)' }}>v1.2 Draft</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => copyDraft()} className="p-2 hover:bg-surface-container rounded-lg text-primary transition-colors" title="Copy">
+                    <button type="button" onClick={() => copyDraft()} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--accent)' }} title="Copy">
                       <span className="material-symbols-outlined">content_copy</span>
                     </button>
-                    <button type="button" onClick={() => downloadTxt()} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-container rounded-lg text-primary transition-colors text-sm font-medium">
+                    <button type="button" onClick={() => downloadTxt()} className="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium" style={{ color: 'var(--accent)' }}>
                       <span className="material-symbols-outlined text-[20px]">download</span> .txt
                     </button>
                     <button
                       type="button"
                       disabled={draftLoading || exportingPdf}
                       onClick={() => void exportPdf()}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg transition-all hover:opacity-90 text-sm font-medium disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 rounded-full transition-all hover:opacity-90 text-sm font-bold disabled:opacity-50"
+                      style={{ background: 'var(--accent)', color: '#fff' }}
                     >
                       <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
                       {exportingPdf ? 'Exporting…' : 'PDF Export'}
@@ -247,11 +250,11 @@ export default function AppealDrafting() {
             {/* Sidebar */}
             <div className="lg:col-span-4 space-y-8">
               {/* Assumptions & Gaps — POST /outputs/assumptions */}
-              <section className="bg-surface-container-high p-6 rounded-xl">
+              <section className="p-6 rounded-2xl" style={{ background: '#fff', border: '1px solid var(--line)' }}>
                 <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">psychology</span>
-                    <h3 className="font-headline font-bold text-lg text-primary">Assumptions &amp; Gaps</h3>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--accent)' }}>psychology</span>
+                    <h3 className="font-bold text-lg" style={{ color: 'var(--accent)' }}>Assumptions &amp; Gaps</h3>
                   </div>
                   {assumptionsState.overall_confidence_percentage ? (
                     <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -303,8 +306,8 @@ export default function AppealDrafting() {
               </section>
 
               {/* Action Plan */}
-              <section className="bg-surface-container-low p-6 rounded-xl">
-                <h3 className="font-headline font-bold text-lg text-primary mb-4">Action Plan</h3>
+              <section className="p-6 rounded-2xl" style={{ background: '#fff', border: '1px solid var(--line)' }}>
+                <h3 className="font-bold text-lg mb-4" style={{ color: 'var(--accent)' }}>Action Plan</h3>
                 <div className="space-y-3">
                   {items.map((item, i) => (
                     <label key={item.label} className="flex items-center gap-3 p-3 bg-surface-container-lowest rounded-lg border border-transparent hover:border-outline-variant/30 cursor-pointer transition-all">
@@ -321,9 +324,9 @@ export default function AppealDrafting() {
               </section>
 
               {/* Indiana Resources */}
-              <section className="relative overflow-hidden rounded-xl bg-primary p-6 text-on-primary shadow-lg ring-1 ring-black/10 dark:!bg-slate-900 dark:!text-slate-100 dark:ring-sky-500/25">
+              <section className="relative overflow-hidden rounded-2xl p-6 shadow-lg" style={{ background: 'var(--accent)', color: '#fff' }}>
                 <div className="relative z-10">
-                  <h3 className="mb-4 font-headline text-lg font-bold">State regulator (from analysis)</h3>
+                  <h3 className="mb-4 text-lg font-bold" style={{ opacity: 0.9 }}>State regulator (from analysis)</h3>
                   <div className="mb-6 space-y-4">
                     <div className="flex items-center gap-3">
                       <span className="material-symbols-outlined text-secondary-fixed dark:!text-sky-400">account_balance</span>
@@ -340,7 +343,8 @@ export default function AppealDrafting() {
                     href={doiBlock?.website || 'https://www.in.gov/idoi/'}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex w-full items-center justify-center rounded-lg bg-on-primary px-4 py-3 text-sm font-bold text-primary transition-colors hover:bg-secondary-container dark:!border dark:!border-slate-600 dark:!bg-slate-800 dark:!text-slate-100 dark:hover:!bg-slate-700"
+                    className="inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-bold transition-colors hover:opacity-90"
+                    style={{ background: '#fff', color: 'var(--accent)' }}
                   >
                     Open regulator site
                     <span className="material-symbols-outlined ml-2 text-[18px]">open_in_new</span>
@@ -355,7 +359,7 @@ export default function AppealDrafting() {
         </div>
       </main>
 
-      <Footer disclaimer="Disclaimer: Resolvly is an advocacy platform and does not provide legal advice. All drafting tools should be reviewed by an attorney or qualified patient advocate before submission to insurers or the State of Indiana." />
+      <DreelioFooter />
     </div>
   )
 }

@@ -1220,3 +1220,17 @@
 
 @keyframes wizSpin { to { transform: rotate(360deg); } }
 .dreelio-landing .wiz-spin { display: inline-block; animation: wizSpin 1s linear infinite; }
+
+/* ====================================================================
+   APP NAV — post-analysis pages
+   ==================================================================== */
+
+/* Mobile bottom nav: hidden on desktop, shown on mobile */
+.app-mobile-bottom-nav { display: none; }
+
+@media (max-width: 767px) {
+  .app-nav-tabs { display: none !important; }
+  .app-mobile-bottom-nav { display: block !important; }
+  /* Add bottom padding so content isn't hidden behind mobile tab bar */
+  .dreelio-landing main { padding-bottom: 76px !important; }
+}
