@@ -4,6 +4,7 @@ import TransitionLink from './TransitionLink'
 import { hashFromNavHref, useActiveSection } from './useActiveSection'
 import { goToSection, scrollToPageTop } from '../../lib/pageScroll'
 import { viewTransitionNavigate } from '../../lib/viewTransitionNavigate'
+import LeaveAnalysisDialog from './LeaveAnalysisDialog'
 
 type NavLink = { t: string; href: string; sectionId?: string }
 
@@ -31,15 +32,21 @@ export default function DreelioNav({
   onStart,
   activePath,
   appMode = false,
+  confirmLeaveHome = false,
+  onConfirmLeaveHome,
 }: {
   onStart?: () => void
   activePath?: 'home' | 'resources'
   appMode?: boolean
+  /** When true, logo / back-to-home triggers the leave-analysis dialog instead of navigating immediately. */
+  confirmLeaveHome?: boolean
+  onConfirmLeaveHome?: () => void
 }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false)
   const onHome = pathname === '/'
   const activeSectionId = useActiveSection(['pipeline', 'features'], onHome)
 
@@ -82,8 +89,15 @@ export default function DreelioNav({
     setMenuOpen(false)
   }
 
-  function handleLogoClick(e: MouseEvent<HTMLAnchorElement>) {
-    e.preventDefault()
+  function requestLeaveHome() {
+    if (confirmLeaveHome && onConfirmLeaveHome) {
+      setShowLeaveWarning(true)
+      return
+    }
+    goHome()
+  }
+
+  function goHome() {
     closeMenu()
     if (pathname !== '/') {
       viewTransitionNavigate(navigate, '/')
@@ -93,6 +107,21 @@ export default function DreelioNav({
       window.history.replaceState(null, '', '/')
     }
     scrollToPageTop('smooth')
+  }
+
+  function handleLogoClick(e: MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault()
+    requestLeaveHome()
+  }
+
+  function confirmLeaveHomeAction() {
+    setShowLeaveWarning(false)
+    closeMenu()
+    if (onConfirmLeaveHome) {
+      onConfirmLeaveHome()
+      return
+    }
+    goHome()
   }
 
   function handleSectionClick(e: MouseEvent<HTMLAnchorElement>, href: string, sectionId?: string) {
@@ -142,22 +171,23 @@ export default function DreelioNav({
     .join(' ')
 
   return (
-    <div
-      className={['dreelio-nav-shell', menuOpen ? 'is-menu-open' : ''].filter(Boolean).join(' ')}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: scrolled ? '14px 16px 0' : '0',
-        transition: 'padding .45s var(--ease)',
-        pointerEvents: 'none',
-      }}
-    >
+    <>
+      <div
+        className={['dreelio-nav-shell', menuOpen ? 'is-menu-open' : ''].filter(Boolean).join(' ')}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: scrolled ? '14px 16px 0' : '0',
+          transition: 'padding .45s var(--ease)',
+          pointerEvents: 'none',
+        }}
+      >
       {menuOpen ? (
         <button
           type="button"
@@ -175,24 +205,47 @@ export default function DreelioNav({
         </div>
 
         {appMode ? (
-          <Link
-            to="/"
-            className="nav-desktop-cta"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--accent)',
-              textDecoration: 'none',
-              padding: '9px 0',
-              opacity: 1,
-              transition: 'opacity .2s',
-            }}
-          >
-            ← Back to Home
-          </Link>
+          confirmLeaveHome ? (
+            <button
+              type="button"
+              className="nav-desktop-cta"
+              onClick={requestLeaveHome}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--accent)',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '9px 0',
+                opacity: 1,
+              }}
+            >
+              ← Back to Home
+            </button>
+          ) : (
+            <Link
+              to="/"
+              className="nav-desktop-cta"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--accent)',
+                textDecoration: 'none',
+                padding: '9px 0',
+                opacity: 1,
+                transition: 'opacity .2s',
+              }}
+            >
+              ← Back to Home
+            </Link>
+          )
         ) : (
           <button
             type="button"
@@ -226,9 +279,24 @@ export default function DreelioNav({
       </nav>
 
       {menuOpen ? (
-        <MobileMenuStack links={links} renderLink={renderLink} onStart={onStart} onClose={closeMenu} appMode={appMode} />
+        <MobileMenuStack
+          links={links}
+          renderLink={renderLink}
+          onStart={onStart}
+          onClose={closeMenu}
+          appMode={appMode}
+          onRequestLeaveHome={requestLeaveHome}
+          confirmLeaveHome={confirmLeaveHome}
+        />
       ) : null}
-    </div>
+      </div>
+
+      <LeaveAnalysisDialog
+        open={showLeaveWarning}
+        onStay={() => setShowLeaveWarning(false)}
+        onLeave={confirmLeaveHomeAction}
+      />
+    </>
   )
 }
 
@@ -238,12 +306,16 @@ function MobileMenuStack({
   onStart,
   onClose,
   appMode = false,
+  confirmLeaveHome = false,
+  onRequestLeaveHome,
 }: {
   links: NavLink[]
   renderLink: (l: NavLink, mobile?: boolean) => ReactNode
   onStart?: () => void
   onClose: () => void
   appMode?: boolean
+  confirmLeaveHome?: boolean
+  onRequestLeaveHome?: () => void
 }) {
   return (
     <div className="mobile-nav-stack" style={{ pointerEvents: 'auto' }}>
@@ -253,24 +325,47 @@ function MobileMenuStack({
         </nav>
       </div>
       {appMode ? (
-        <Link
-          to="/"
-          className="btn mobile-nav-cta"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            background: 'transparent',
-            border: '2px solid var(--accent)',
-            color: 'var(--accent)',
-            fontWeight: 700,
-            textDecoration: 'none',
-          }}
-          onClick={onClose}
-        >
-          ← Back to Home
-        </Link>
+        confirmLeaveHome ? (
+          <button
+            type="button"
+            className="btn mobile-nav-cta"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              background: 'transparent',
+              border: '2px solid var(--accent)',
+              color: 'var(--accent)',
+              fontWeight: 700,
+            }}
+            onClick={() => {
+              onClose()
+              onRequestLeaveHome?.()
+            }}
+          >
+            ← Back to Home
+          </button>
+        ) : (
+          <Link
+            to="/"
+            className="btn mobile-nav-cta"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              background: 'transparent',
+              border: '2px solid var(--accent)',
+              color: 'var(--accent)',
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+            onClick={onClose}
+          >
+            ← Back to Home
+          </Link>
+        )
       ) : (
         <button
           type="button"

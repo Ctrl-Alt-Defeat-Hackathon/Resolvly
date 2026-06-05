@@ -11,8 +11,9 @@ import {
   fetchDemoFile,
   type DemoCaseId,
 } from '../lib/demoDocuments'
-import { STORAGE_KEYS, saveAnalysisBundle } from '../lib/sessionKeys'
-import { prefetchActionPlanOutputs, prefetchSecondaryOutputs } from '../lib/outputsCache'
+import { STORAGE_KEYS, saveAnalysisBundle, clearAnalysisSession, hasActiveAnalysis } from '../lib/sessionKeys'
+import { prefetchActionPlanOutputs, prefetchSecondaryOutputs, clearAllOutputsCache } from '../lib/outputsCache'
+import { viewTransitionNavigate } from '../lib/viewTransitionNavigate'
 
 export const RESOLVLY_ANALYSIS_COMPLETE_KEY = STORAGE_KEYS.ANALYSIS_COMPLETE
 
@@ -521,6 +522,38 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
   const [completedCount, setCompletedCount] = useState(0)
   const [pipelineDone, setPipelineDone]     = useState(false)
   const pipelineRunningRef = useRef(false)
+  const pipelineCancelledRef = useRef(false)
+  const finishTimerRef = useRef<number | null>(null)
+
+  const hasWizardProgress =
+    phase === 'processing' ||
+    step > 0 ||
+    files.length > 0 ||
+    planType !== '' ||
+    funding !== ''
+  const shouldConfirmLeave = hasActiveAnalysis() || hasWizardProgress
+
+  useEffect(() => {
+    pipelineCancelledRef.current = false
+    return () => {
+      pipelineCancelledRef.current = true
+      if (finishTimerRef.current != null) {
+        window.clearTimeout(finishTimerRef.current)
+        finishTimerRef.current = null
+      }
+    }
+  }, [])
+
+  function handleConfirmLeaveHome() {
+    pipelineCancelledRef.current = true
+    if (finishTimerRef.current != null) {
+      window.clearTimeout(finishTimerRef.current)
+      finishTimerRef.current = null
+    }
+    clearAnalysisSession()
+    clearAllOutputsCache()
+    viewTransitionNavigate(navigate, '/')
+  }
 
   // File input refs
   const denialRef   = useRef<HTMLInputElement>(null)
@@ -531,10 +564,10 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
   }
 
   useEffect(() => {
-    if (sessionStorage.getItem(RESOLVLY_ANALYSIS_COMPLETE_KEY) === '1') {
+    if (sessionStorage.getItem(RESOLVLY_ANALYSIS_COMPLETE_KEY) === '1' && !hasWizardProgress) {
       navigate('/action-plan', { replace: true })
     }
-  }, [navigate])
+  }, [navigate, hasWizardProgress])
 
   // ─ File helpers ─
   function applyFileForKind(kind: DocKind, file: File, displayName?: string) {
@@ -637,13 +670,14 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
   }
 
   const finishAndNavigate = useCallback(() => {
+    if (pipelineCancelledRef.current) return
     sessionStorage.setItem(RESOLVLY_ANALYSIS_COMPLETE_KEY, '1')
     persistDocProfile()
     navigate('/action-plan')
   }, [navigate, files])
 
   const runPipeline = useCallback(async () => {
-    if (pipelineRunningRef.current) return
+    if (pipelineRunningRef.current || pipelineCancelledRef.current) return
     pipelineRunningRef.current = true
 
     const plan_context = buildPlanContext(planType, funding)
@@ -656,6 +690,7 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
     try {
       setCompletedCount(0)
       const up = await uploadDocuments(fileBlobs)
+      if (pipelineCancelledRef.current) return
       setCompletedCount(1)
 
       const documents = up.documents.map(d => ({ doc_id: d.doc_id, text_extracted: d.text_extracted }))
@@ -664,6 +699,7 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
         documents,
         plan_context: plan_context as Record<string, unknown>,
       })
+      if (pipelineCancelledRef.current) return
       setCompletedCount(3)
 
       let wizard: Record<string, unknown> | null = null
@@ -677,12 +713,14 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
       } catch {
         wizard = null
       }
+      if (pipelineCancelledRef.current) return
       setCompletedCount(6)
 
       const analyzed = await analyzeClaim(
         ext.claim_object as Record<string, unknown>,
         plan_context as Record<string, unknown>,
       )
+      if (pipelineCancelledRef.current) return
       setCompletedCount(7)
 
       saveAnalysisBundle({
@@ -701,18 +739,24 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
       const en = analyzed.enrichment as Record<string, unknown>
       void prefetchActionPlanOutputs(co, an, en).then(() => prefetchSecondaryOutputs(co, an, en))
 
-      window.setTimeout(() => finishAndNavigate(), 400)
+      finishTimerRef.current = window.setTimeout(() => {
+        finishTimerRef.current = null
+        finishAndNavigate()
+      }, 400)
     } finally {
       pipelineRunningRef.current = false
     }
   }, [files, planType, funding, finishAndNavigate])
 
   const beginAnalysis = useCallback(() => {
+    pipelineCancelledRef.current = false
+    sessionStorage.removeItem(RESOLVLY_ANALYSIS_COMPLETE_KEY)
     setPipelineError(null)
     setCompletedCount(0)
     setPipelineDone(false)
     setPhase('processing')
     void runPipeline().catch(e => {
+      if (pipelineCancelledRef.current) return
       setPipelineError(e instanceof Error ? e.message : String(e))
     })
   }, [runPipeline])
@@ -725,7 +769,11 @@ export default function AnalyzeFlow({ isDemo = false }: { isDemo?: boolean }) {
       className="dreelio-landing wizard-shell"
       style={{ background: 'var(--canvas)' }}
     >
-      <DreelioNav onStart={() => {}} />
+      <DreelioNav
+        onStart={() => {}}
+        confirmLeaveHome={shouldConfirmLeave}
+        onConfirmLeaveHome={handleConfirmLeaveHome}
+      />
 
       <main style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 80px)' }}>
         <div className="wizard-layout" style={{ flex: 1 }}>
