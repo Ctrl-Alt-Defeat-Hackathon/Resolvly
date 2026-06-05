@@ -4,13 +4,16 @@ import { clearAllOutputsCache } from '../lib/outputsCache'
 import { clearAnalysisSession, hasActiveAnalysis } from '../lib/sessionKeys'
 import LeaveAnalysisDialog from './marketing/LeaveAnalysisDialog'
 
-type NavItem = { label: string; to: string; icon: string; short: string }
+type NavItem = { label: string; to: string; icon: string; short: string; requiresAnalysis?: boolean }
 
-const APP_NAV: NavItem[] = [
-  { label: 'Action Plan',       to: '/action-plan',       icon: 'assignment',    short: 'Plan'    },
-  { label: 'Appeal Drafting',   to: '/appeal-drafting',   icon: 'edit_document', short: 'Appeal'  },
+const ANALYSIS_NAV: NavItem[] = [
+  { label: 'Action Plan', to: '/action-plan', icon: 'assignment', short: 'Plan', requiresAnalysis: true },
+  { label: 'Appeal Drafting', to: '/appeal-drafting', icon: 'edit_document', short: 'Appeal', requiresAnalysis: true },
+]
+
+const RESOURCE_NAV: NavItem[] = [
   { label: 'Indiana Resources', to: '/indiana-resources', icon: 'library_books', short: 'Indiana' },
-  { label: 'Code Lookup',       to: '/code-lookup',       icon: 'search',        short: 'Codes'   },
+  { label: 'Code Lookup', to: '/code-lookup', icon: 'search', short: 'Codes' },
 ]
 
 function isNavActive(pathname: string, to: string): boolean {
@@ -23,6 +26,8 @@ export default function AppNav() {
   const [scrolled, setScrolled] = useState(false)
   const [showLeaveWarning, setShowLeaveWarning] = useState(false)
   const needsLeaveConfirm = hasActiveAnalysis()
+  const analysisReady = needsLeaveConfirm
+  const visibleNav = analysisReady ? [...ANALYSIS_NAV, ...RESOURCE_NAV] : RESOURCE_NAV
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40)
@@ -123,7 +128,7 @@ export default function AppNav() {
 
           {/* App tabs */}
           <div className="nav-links nav-links-desktop app-nav-tabs">
-            {APP_NAV.map(({ label, to }) => {
+            {visibleNav.map(({ label, to }) => {
               const isActive = isNavActive(pathname, to)
               return (
                 <Link
@@ -158,7 +163,7 @@ export default function AppNav() {
         }}
       >
         <div style={{ display: 'flex', height: '100%' }}>
-          {APP_NAV.map(({ to, icon, short }) => {
+          {visibleNav.map(({ to, icon, short }) => {
             const isActive = isNavActive(pathname, to)
             return (
               <Link

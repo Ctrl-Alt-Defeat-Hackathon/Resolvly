@@ -10,6 +10,7 @@ import AppealDrafting from './pages/AppealDrafting'
 import IndianaResourcesLayout from './pages/IndianaResourcesLayout'
 import IndianaResourcesHub from './pages/IndianaResourcesHub'
 import CodeLookupContent from './pages/CodeLookupContent'
+import RequireAnalysis from './components/RequireAnalysis'
 
 function App() {
   return (
@@ -21,9 +22,9 @@ function App() {
         <Route path="/upload-wizard" element={<Navigate to="/analyze" replace />} />
         <Route path="/analyze" element={<AnalyzeFlow />} />
         <Route path="/demo" element={<DemoFlow />} />
-        <Route path="/action-plan" element={<ActionPlan />} />
+        <Route path="/action-plan" element={<RequireAnalysis><ActionPlan /></RequireAnalysis>} />
         <Route path="/bill-breakdown" element={<BillBreakdown />} />
-        <Route path="/appeal-drafting" element={<AppealDrafting />} />
+        <Route path="/appeal-drafting" element={<RequireAnalysis><AppealDrafting /></RequireAnalysis>} />
         <Route path="/indiana-resources" element={<IndianaResourcesLayout />}>
           <Route index element={<IndianaResourcesHub />} />
         </Route>
